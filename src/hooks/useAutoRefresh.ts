@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeDataChanged, type DataEntity } from "@/lib/data-events";
+import { clientExceptionInfo, publishError } from "@/lib/client-errors";
 
 interface UseAutoRefreshOptions {
   /** Batch rapid events into a single refresh. */
@@ -10,6 +11,8 @@ interface UseAutoRefreshOptions {
   skipAfterMs?: number;
   /** Refetch when the tab becomes visible again (cross-tab freshness). */
   focus?: boolean;
+  /** Load once on mount through the same deduped path as every other refresh. */
+  immediate?: boolean;
 }
 
 /**
@@ -27,7 +30,7 @@ export function useAutoRefresh(
   entities: DataEntity[],
   options: UseAutoRefreshOptions = {}
 ) {
-  const { debounceMs = 400, skipAfterMs = 2000, focus = true } = options;
+  const { debounceMs = 400, skipAfterMs = 2000, focus = true, immediate = false } = options;
   const [refreshing, setRefreshing] = useState(false);
   const state = useRef({ running: false, pending: false, lastDoneAt: 0 });
   const fnRef = useRef(refreshFn);
@@ -45,9 +48,17 @@ export function useAutoRefresh(
       return;
     }
     state.current.running = true;
+    // Mark the start, not the end: a page's own notifyDataChanged() arrives while
+    // this refresh is still running and must not schedule a second identical one.
+    state.current.lastDoneAt = Date.now();
     setRefreshing(true);
     try {
       await fnRef.current();
+    } catch (error) {
+      // A rejected refresh must never escape into window.onunhandledrejection.
+      // Errors already turned into a report by apiFetch are not reported twice.
+      const reported = error && typeof error === "object" && "reported" in error && error.reported;
+      if (!reported) publishError(clientExceptionInfo(error, "autorefresh"));
     } finally {
       state.current.running = false;
       state.current.lastDoneAt = Date.now();
@@ -63,6 +74,13 @@ export function useAutoRefresh(
   useEffect(() => {
     runRef.current = run;
   }, [run]);
+
+  const didInitialLoad = useRef(false);
+  useEffect(() => {
+    if (!immediate || didInitialLoad.current) return;
+    didInitialLoad.current = true;
+    void Promise.resolve().then(() => runRef.current());
+  }, [immediate]);
 
   const refresh = useCallback(() => {
     void runRef.current();

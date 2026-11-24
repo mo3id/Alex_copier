@@ -67,8 +67,33 @@ export function toClientError(data: unknown, action?: string): ClientErrorInfo |
   };
 }
 
+/** Browser fetch failures are network problems, not mysterious UI crashes. */
+export function isNetworkFailure(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|aborted|abort|timeout|timed out|terminated/i.test(raw);
+}
+
+/** A fetch that never got a response — the real cause behind "Failed to fetch". */
+export function networkErrorInfo(error: unknown, action = "network"): ClientErrorInfo {
+  const definition = getErrorDefinition("NETWORK_ERROR");
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown network error";
+  return {
+    code: "NETWORK_ERROR",
+    messageAr: definition.ar,
+    messageEn: definition.en,
+    hintAr: definition.hintAr,
+    hintEn: definition.hintEn,
+    path: typeof window === "undefined" ? undefined : window.location.pathname,
+    action,
+    at: new Date().toISOString(),
+    source: "client",
+    details: raw.slice(0, 800),
+  };
+}
+
 /** JS exceptions / rejected promises outside an API response. */
 export function clientExceptionInfo(error: unknown, action = "client"): ClientErrorInfo {
+  if (isNetworkFailure(error)) return networkErrorInfo(error, action);
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown client error";
   return {
     code: "CLIENT_ERROR",

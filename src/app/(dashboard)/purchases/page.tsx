@@ -19,6 +19,7 @@ import SearchableSelect from "@/components/SearchableSelect";
 import PrintMenu from "@/components/PrintMenu";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
+import { apiFetch } from "@/lib/fetch-client";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
@@ -58,6 +59,15 @@ interface InterCompanyInvoice {
   orderType?: string; paymentMethod?: string; paidAmount?: number; taxRate?: number; discount?: number; discountType?: string;
 }
 interface InterRow { productId: string; quantity: string; internalPrice: string; customerPrice: string; costPrice: string; }
+interface PurchasesBootstrap {
+  orders: PurchaseOrder[];
+  intercompany: InterCompanyInvoice[];
+  suppliers: Supplier[];
+  companies: Company[];
+  products: Product[];
+  customers: Customer[];
+  engineers: { id: string; name: string }[];
+}
 interface InterForm {
   fromCompanyId: string; toCompanyId: string; customerId: string; engineerId: string; orderType: string; paymentMethod: string;
   internalPaymentMethod: string; paidAmount: string; internalPaidAmount: string; isTaxInvoice: boolean; taxRate: string;
@@ -156,26 +166,36 @@ export default function PurchasesPage() {
 
   const fetchData = async () => {
     try {
-      const [pRes, sRes, prRes, coRes, cuRes, enRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/suppliers"), fetch("/api/inventory"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers/options")]);
-      const pData = await pRes.json().catch(() => []);
-      setOrders(Array.isArray(pData) ? pData : pData.orders || []);
-      setIntercompanyInvoices(Array.isArray(pData) ? [] : pData.intercompany || []);
-      setSuppliers(await sRes.json().catch(() => []));
-      setCompanies(await coRes.json().catch(() => []));
-      const en = await enRes.json().catch(() => []);
-      setEngineers(Array.isArray(en) ? en.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })) : []);
-      const cu = await cuRes.json();
-      setCustomers(Array.isArray(cu) ? cu.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })) : []);
-      const inv = await prRes.json();
-      const allProducts: (Product | undefined)[] = Array.isArray(inv) ? inv.map((i: { product?: Product }) => i.product) : [];
-      setProducts(Array.from(new Map(allProducts.filter((p): p is Product => Boolean(p)).map((p) => [p.id, p])).values()));
+      const { response, data } = await apiFetch<PurchasesBootstrap>("/api/purchases/bootstrap", {
+        action: "load purchases",
+      });
+      if (!response.ok) {
+        toastError(apiErrorMessage(data as { code?: string; error?: string }, t));
+        return;
+      }
+      if (!data) {
+        toastError(t("common.connectionError"));
+        return;
+      }
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setIntercompanyInvoices(Array.isArray(data.intercompany) ? data.intercompany : []);
+      setSuppliers(Array.isArray(data.suppliers) ? data.suppliers : []);
+      setCompanies(Array.isArray(data.companies) ? data.companies : []);
+      setEngineers(Array.isArray(data.engineers) ? data.engineers : []);
+      setCustomers(Array.isArray(data.customers) ? data.customers : []);
+      setProducts(Array.isArray(data.products) ? data.products : []);
+    } catch {
+      // apiFetch already published the network error; never leak a rejection.
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
-  const { refresh, refreshing } = useAutoRefresh(fetchData, ["purchases", "products", "inventory", "warehouses", "suppliers", "returns"]);
+  const { refresh, refreshing } = useAutoRefresh(
+    fetchData,
+    ["purchases", "products", "inventory", "warehouses", "suppliers", "returns"],
+    { immediate: true },
+  );
 
   const openCreateOrder = () => {
     setEditingId(null);
@@ -289,13 +309,14 @@ export default function PurchasesPage() {
       for (const id of missing) next[id] = true;
       return next;
     });
-    fetch("/api/products/price-history", {
+    void apiFetch<{ prices: Record<string, PriceHistory> }>("/api/products/price-history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyId, productIds: missing }),
+      action: "load purchase price history",
+      silent: true,
     })
-      .then((res) => res.json().catch(() => null))
-      .then((data) => {
+      .then(({ data }) => {
         if (!data?.prices) return;
         const prices = data.prices as Record<string, PriceHistory>;
         setPriceHistory((prev) => ({ ...prev, ...prices }));
@@ -356,6 +377,7 @@ export default function PurchasesPage() {
         ? computedTotal
         : (form.paidAmount === "" ? 0 : Number(form.paidAmount));
     setSaving(true);
+    let saved = false;
     try {
       const orderDateIso = form.orderDate
         ? new Date(`${form.orderDate}T12:00:00.000Z`).toISOString()
@@ -363,13 +385,22 @@ export default function PurchasesPage() {
       const payload = { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, items };
       const url = editingId ? `/api/purchases/${editingId}` : "/api/purchases";
       const method = editingId ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
+      const { response, data } = await apiFetch<PurchaseOrder>(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        action: editingId ? "update purchase invoice" : "create purchase invoice",
+        timeoutMs: 45_000,
+      });
+      if (!response.ok) { toastError(apiErrorMessage(data as { code?: string; error?: string }, t)); return; }
       toastSuccess(editingId ? t("common.updatedSuccessfully") : t("common.addedSuccessfully"));
+      saved = true;
+    } catch {
+      // apiFetch published the network error; keep the form open for a retry.
     } finally {
       setSaving(false);
     }
+    if (!saved) return;
     resetOrderForm();
     refresh();
     notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
@@ -557,20 +588,26 @@ export default function PurchasesPage() {
       }));
     if (items.length === 0) return;
     setSaving(true);
+    let saved = false;
     try {
-      const res = await fetch(`/api/sales/intercompany/${editingIc}`, {
+      const { response, data } = await apiFetch(`/api/sales/intercompany/${editingIc}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...interForm, discountType: "FIXED", items }),
+        action: "update intercompany invoice",
+        timeoutMs: 45_000,
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
+      if (!response.ok) { toastError(apiErrorMessage(data as { code?: string; error?: string }, t)); return; }
       toastSuccess(t("common.updatedSuccessfully"));
-      refresh();
-      notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
+      saved = true;
+    } catch {
+      // network error already reported
     } finally {
       setSaving(false);
     }
+    if (!saved) return;
+    refresh();
+    notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
     setEditingIc(null);
     setShowIcForm(false);
     setPriceHistory({});
@@ -580,9 +617,16 @@ export default function PurchasesPage() {
 
   const handleDelete = async (id: string) => {
     if (!(await confirmAction({ message: t("common.deleteConfirm") }))) return;
-    const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
+    try {
+      const { response, data } = await apiFetch(`/api/purchases/${id}`, {
+        method: "DELETE",
+        action: "delete purchase invoice",
+        timeoutMs: 45_000,
+      });
+      if (!response.ok) { toastError(apiErrorMessage(data as { code?: string; error?: string }, t)); return; }
+    } catch {
+      return;
+    }
     setPriceHistory({});
     setPriceHistoryLoading({});
     refresh();

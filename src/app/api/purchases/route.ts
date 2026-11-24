@@ -5,6 +5,7 @@ import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helper
 import { findOrCreateMainWarehouse, receivePurchaseIntoStock } from "@/lib/stock-movement-helper";
 import { normalizePurchaseItems } from "@/lib/purchase-items";
 import { traceError } from "@/lib/prisma-errors";
+import { getPurchasesFeed } from "@/lib/purchases-feed";
 
 async function GET__raw() {
   try {
@@ -17,73 +18,8 @@ async function GET__raw() {
       );
     }
 
-    const [purchases, intercompanyRows] = await Promise.all([
-      prisma.purchaseOrder.findMany({
-        include: {
-          supplier: true,
-          company: true,
-          items: {
-            include: { product: true },
-          },
-          invoices: true,
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.interCompanyInvoice.findMany({
-        include: {
-          fromCompany: { select: { id: true, name: true } },
-          toCompany: { select: { id: true, name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
-
-    const salesOrderIds = Array.from(
-      new Set(
-        intercompanyRows
-          .map((inv) => inv.salesOrderId)
-          .filter((id): id is string => typeof id === "string" && id.length > 0)
-      )
-    );
-
-    const salesOrders = salesOrderIds.length
-      ? await prisma.salesOrder.findMany({
-          where: { id: { in: salesOrderIds } },
-          select: {
-            id: true,
-            orderType: true,
-            paymentMethod: true,
-            paidAmount: true,
-            taxRate: true,
-            discount: true,
-            discountType: true,
-            notes: true,
-            engineer: { select: { id: true, name: true } },
-            customer: { select: { id: true, name: true } },
-            items: { include: { product: true } },
-          },
-        })
-      : [];
-
-    const salesOrderMap = new Map(salesOrders.map((so) => [so.id, so]));
-
-    const intercompany = intercompanyRows.map((inv) => {
-      const so = inv.salesOrderId ? salesOrderMap.get(inv.salesOrderId) : undefined;
-      return {
-        ...inv,
-        items: so?.items ?? [],
-        customer: so?.customer ? { id: so.customer.id, name: so.customer.name } : null,
-        engineer: so?.engineer ? { id: so.engineer.id, name: so.engineer.name } : null,
-        orderType: so?.orderType,
-        paymentMethod: so?.paymentMethod,
-        paidAmount: so?.paidAmount,
-        taxRate: so?.taxRate,
-        discount: so?.discount,
-        discountType: so?.discountType,
-      };
-    });
-
-    return NextResponse.json({ orders: purchases, intercompany });
+    const feed = await getPurchasesFeed();
+    return NextResponse.json(feed);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch purchases" },
