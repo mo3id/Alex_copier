@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -18,7 +18,8 @@ import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { apiErrorMessage } from "@/lib/api-client";
+import { apiErrorMessage, fill } from "@/lib/api-client";
+import { apiFetch } from "@/lib/fetch-client";
 import { useRouter } from "next/navigation";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -35,6 +36,15 @@ interface Expense {
 }
 
 const payerName = (expense: Expense) => expense.payer?.name || expense.paidBy;
+const MAX_EXPENSE_ROWS = 50;
+
+interface ExpenseRow {
+  key: string;
+  categoryId: string;
+  category: string;
+  description: string;
+  amount: string;
+}
 
 export default function FinancePage() {
   const { t, dir } = useI18n();
@@ -50,41 +60,59 @@ export default function FinancePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Expense | null>(null);
   const [formError, setFormError] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [form, setForm] = useState({ companyId: "", categoryId: "", category: "", description: "", amount: "" });
+  const rowIdRef = useRef(0);
+  const makeRow = useCallback(
+    (): ExpenseRow => ({ key: `expense-row-${++rowIdRef.current}`, categoryId: "", category: "", description: "", amount: "" }),
+    []
+  );
+  const [rows, setRows] = useState<ExpenseRow[]>(() => [
+    { key: "expense-row-0", categoryId: "", category: "", description: "", amount: "" },
+  ]);
   const PAGE_SIZE = 10;
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [eRes, cRes, catRes] = await Promise.all([fetch("/api/expenses"), fetch("/api/companies"), fetch("/api/expense-categories")]);
-      if (eRes.status === 401 || cRes.status === 401) {
+      const [expenseResult, companyResult, categoryResult] = await Promise.all([
+        apiFetch<Expense[]>("/api/expenses", { action: "load expenses" }),
+        apiFetch<Company[]>("/api/companies", { action: "load companies" }),
+        apiFetch<Category[]>("/api/expense-categories", { action: "load expense categories" }),
+      ]);
+      if (
+        expenseResult.response.status === 401 ||
+        companyResult.response.status === 401 ||
+        categoryResult.response.status === 401
+      ) {
         signOut({ callbackUrl: "/login" });
         return;
       }
-      const cats = await catRes.json().catch(() => []);
-      const eData = await eRes.json().catch(() => []);
-      setExpenses(Array.isArray(eData) ? eData : []);
-      const cData = await cRes.json().catch(() => []);
-      setCompanies(Array.isArray(cData) ? cData : []);
-      setCategories(Array.isArray(cats) ? cats : []);
+      setExpenses(Array.isArray(expenseResult.data) ? expenseResult.data : []);
+      setCompanies(Array.isArray(companyResult.data) ? companyResult.data : []);
+      setCategories(Array.isArray(categoryResult.data) ? categoryResult.data : []);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
-  const { refresh, refreshing } = useAutoRefresh(fetchData, ["expenses", "companies"]);
+  const { refresh, refreshing } = useAutoRefresh(fetchData, ["expenses", "companies"], { immediate: true });
 
   useEffect(() => {
-    const handler = () => setShowForm(true);
+    const handler = () => {
+      setCompanyId("");
+      setRows([makeRow()]);
+      setEditingId(null);
+      setFormError("");
+      setShowForm(true);
+    };
     window.addEventListener("erp-open-add", handler);
     return () => window.removeEventListener("erp-open-add", handler);
-  }, []);
+  }, [makeRow]);
 
   const filtered = expenses.filter((expense) => {
     const matchesCompany = !companyFilter || expense.companyId === companyFilter;
@@ -121,6 +149,7 @@ export default function FinancePage() {
     .filter((e) => (e.date || e.createdAt).slice(0, 7) === currentMonth)
     .reduce((sum, e) => sum + (e.amount || 0), 0);
   const stats = { count: filtered.length, total, today: todayTotal, month: monthTotal };
+  const batchTotal = rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
 
   // Deduplicated category options for table filter:
   const filterCategories = companyFilter
@@ -137,8 +166,8 @@ export default function FinancePage() {
   const categoryFilterOptions = uniqueFilterCategories.map((c) => ({ value: c.id, label: c.name }));
 
   // Deduplicated and company-filtered category options for modal form:
-  const modalCategories = form.companyId
-    ? categories.filter((c) => c.companyId === form.companyId)
+  const modalCategories = companyId
+    ? categories.filter((c) => c.companyId === companyId)
     : categories;
   const uniqueFormCategories: { id: string; name: string }[] = [];
   const seenFormNames = new Set<string>();
@@ -170,7 +199,8 @@ export default function FinancePage() {
   });
 
   const openCreate = () => {
-    setForm({ companyId: "", categoryId: "", category: "", description: "", amount: "" });
+    setCompanyId("");
+    setRows([makeRow()]);
     setEditingId(null);
     setFormError("");
     setShowForm(true);
@@ -178,66 +208,138 @@ export default function FinancePage() {
 
   const openEdit = (expense: Expense) => {
     setSelected(null);
-    setForm({
-      companyId: expense.companyId,
-      categoryId: expense.expenseCategory?.id || expense.categoryId || "",
-      category: expense.expenseCategory?.name || expense.category,
-      description: expense.description,
-      amount: String(expense.amount),
-    });
+    setCompanyId(expense.companyId);
+    setRows([
+      {
+        ...makeRow(),
+        categoryId: expense.expenseCategory?.id || expense.categoryId || "",
+        category: expense.expenseCategory?.name || expense.category,
+        description: expense.description,
+        amount: String(expense.amount),
+      },
+    ]);
     setEditingId(expense.id);
     setFormError("");
     setShowForm(true);
   };
 
-  const selectCategory = (categoryId: string) => {
-    const cat = categories.find((c) => c.id === categoryId);
-    setForm((f) => ({ ...f, categoryId, category: cat?.name || "" }));
+  const patchRow = (key: string, patch: Partial<ExpenseRow>) => {
+    setRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  };
+
+  const changeCompany = (value: string) => {
+    setCompanyId(value);
+    setRows((prev) => prev.map((row) => ({ ...row, categoryId: "", category: "" })));
+  };
+
+  const selectCategory = (key: string, categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    patchRow(key, { categoryId, category: category?.name || "" });
+  };
+
+  const addExpenseRow = () => {
+    if (rows.length >= MAX_EXPENSE_ROWS) return;
+    setRows((prev) => [...prev, makeRow()]);
+  };
+
+  const removeExpenseRow = (key: string) => {
+    setRows((prev) => (prev.length === 1 ? prev : prev.filter((row) => row.key !== key)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setFormError("");
-    const res = await fetch(editingId ? `/api/expenses/${editingId}` : "/api/expenses", {
-      method: editingId ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, categoryId: form.categoryId || null, category: form.category || (categories.find((c) => c.id === form.categoryId)?.name || ""), amount: parseFloat(form.amount) || 0 }),
-    });
-    setSaving(false);
-    if (res.status === 401) {
-      signOut({ callbackUrl: "/login" });
+
+    if (!companyId) {
+      setFormError(t("finance.selectCompany"));
       return;
     }
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      setFormError(apiErrorMessage(data, t));
+    if (rows.length > MAX_EXPENSE_ROWS) {
+      setFormError(t("finance.maxRows"));
       return;
     }
-    setForm({ companyId: "", categoryId: "", category: "", description: "", amount: "" });
-    setEditingId(null);
-    setShowForm(false);
-    toastSuccess(t("common.savedSuccessfully"));
-    refresh();
-    notifyDataChanged(["expenses"]);
+
+    const prepared = rows.map((row) => ({
+      categoryId: row.categoryId || null,
+      category: row.category.trim(),
+      description: row.description.trim(),
+      amount: Number(row.amount),
+    }));
+    const invalidIndex = prepared.findIndex(
+      (row) =>
+        (!row.categoryId && !row.category) ||
+        !row.description ||
+        !Number.isFinite(row.amount) ||
+        row.amount <= 0
+    );
+    if (invalidIndex >= 0) {
+      setFormError(`${t("finance.invalidRow")} ${invalidIndex + 1}`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const editing = Boolean(editingId);
+      const { response, data } = await apiFetch<{ error?: string }>(
+        editing ? `/api/expenses/${editingId}` : "/api/expenses/batch",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? { companyId, ...prepared[0] } : { companyId, items: prepared }),
+          action: editing ? "update expense" : "add expenses",
+          timeoutMs: 45_000,
+        }
+      );
+
+      if (response.status === 401) {
+        signOut({ callbackUrl: "/login" });
+        return;
+      }
+      if (!response.ok) {
+        setFormError(apiErrorMessage(data, t));
+        return;
+      }
+
+      setCompanyId("");
+      setRows([makeRow()]);
+      setEditingId(null);
+      setShowForm(false);
+      toastSuccess(
+        editing
+          ? t("common.savedSuccessfully")
+          : fill(t("finance.addedExpenses"), { count: prepared.length })
+      );
+      refresh();
+      notifyDataChanged(["expenses"]);
+    } catch {
+      setFormError(t("common.connectionError"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!(await confirmAction({ message: t("common.deleteConfirm") }))) return;
-    const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    if (res.status === 401) {
-      signOut({ callbackUrl: "/login" });
-      return;
+    try {
+      const { response, data } = await apiFetch<{ error?: string }>(`/api/expenses/${id}`, {
+        method: "DELETE",
+        action: "delete expense",
+      });
+      if (response.status === 401) {
+        signOut({ callbackUrl: "/login" });
+        return;
+      }
+      if (!response.ok) {
+        toastError(apiErrorMessage(data, t));
+        return;
+      }
+      setSelected(null);
+      toastSuccess(t("common.deletedSuccessfully"));
+      refresh();
+      notifyDataChanged(["expenses"]);
+    } catch {
+      toastError(t("common.connectionError"));
     }
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      toastError(apiErrorMessage(data, t));
-      return;
-    }
-    setSelected(null);
-    toastSuccess(t("common.deletedSuccessfully"));
-    refresh();
-    notifyDataChanged(["expenses"]);
   };
 
   return (
@@ -253,7 +355,7 @@ export default function FinancePage() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("finance.newExpense")}</button>
+            <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("finance.addMultiple")}</button>
             <button onClick={() => router.push("/expenses/categories")} className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"><Tags size={16} />{t("finance.expenseCategories")}</button>
           </div>
         </div>
@@ -275,38 +377,135 @@ export default function FinancePage() {
           </div>
         )}
 
-        <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? t("finance.editExpense") : t("finance.newExpense")}>
+        <FormModal
+          open={showForm}
+          onClose={() => { setShowForm(false); setEditingId(null); }}
+          title={editingId ? t("finance.editExpense") : t("finance.addMultiple")}
+          wide
+        >
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.selectCompany")}</label><select value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCompany")}</option>{companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <SelectWithAdd
-                label={t("finance.category")}
-                value={form.categoryId}
-                onChange={selectCategory}
-                options={formCategoryOptions}
-                placeholder={t("finance.selectCategory")}
-                required
-                quickAddTitle={t("finance.addCategory")}
-                quickAddFields={[
-                  { key: "name", label: t("finance.categoryName"), required: true },
-                  { key: "companyId", label: t("common.company"), type: "select", required: true, options: companies.map((c) => ({ value: c.id, label: c.name })) },
-                ]}
-                quickAddDefaults={{ companyId: form.companyId }}
-                quickAddEndpoint="/api/expense-categories"
-                onQuickAddSuccess={(item) => {
-                  const companyId = item.companyId || form.companyId;
-                  setCategories((prev) => [...prev, { id: item.id, name: item.name, companyId }]);
-                  setForm((f) => ({ ...f, companyId, categoryId: item.id, category: item.name }));
-                  toastSuccess(t("common.addedSuccessfully"));
-                  notifyDataChanged(["expenses"]);
-                }}
-              />
-              <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.amount")}</label><input type="number" placeholder={t("common.amount")} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required min="0" step="0.01" /></div>
+            <div className="flex items-start gap-2.5 rounded-xl border border-sky-100 bg-sky-50/70 px-3.5 py-3 text-xs leading-relaxed text-sky-800">
+              <Receipt size={16} className="mt-0.5 shrink-0" />
+              <span>{t("finance.batchHint")}</span>
             </div>
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.description")}</label><textarea placeholder={t("common.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} required /></div>
-            <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"><X size={16} className="ms-1 inline-block" />{t("common.cancel")}</button>
-              <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 hover:bg-blue-700 text-white"><Save size={16} /></SubmitButton>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">
+                {t("finance.selectCompany")}<span className="text-red-500 ms-0.5">*</span>
+              </label>
+              <select
+                value={companyId}
+                onChange={(e) => changeCompany(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">{t("finance.selectCompany")}</option>
+                {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+              </select>
+              {!companyId && <p className="text-xs text-amber-600">{t("finance.selectCompanyFirst")}</p>}
+            </div>
+
+            <div className="space-y-3">
+              {!editingId && (
+                <div className="hidden gap-3 px-1 text-xs font-medium text-slate-500 md:grid md:grid-cols-[1.25fr_0.7fr_1.3fr]">
+                  <span>{t("finance.category")}</span>
+                  <span>{t("common.amount")}</span>
+                  <span>{t("common.description")}</span>
+                </div>
+              )}
+
+              {rows.map((row, index) => (
+                <div key={row.key} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-white px-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200">{index + 1}</span>
+                      {t("finance.rowNumber")}
+                    </span>
+                    {!editingId && rows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeExpenseRow(row.key)}
+                        title={t("finance.removeRow")}
+                        aria-label={t("finance.removeRow")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      >
+                        <Trash2 size={13} />{t("common.remove")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-[1.25fr_0.7fr_1.3fr]">
+                    <SelectWithAdd
+                      hideLabel
+                      value={row.categoryId}
+                      onChange={(value) => selectCategory(row.key, value)}
+                      options={formCategoryOptions}
+                      placeholder={t("finance.selectCategory")}
+                      buttonTitle={t("finance.addCategory")}
+                      required
+                      disabled={!companyId}
+                      quickAddTitle={t("finance.addCategory")}
+                      quickAddFields={[
+                        { key: "name", label: t("finance.categoryName"), required: true },
+                        { key: "companyId", label: t("common.company"), type: "select", required: true, options: companies.map((c) => ({ value: c.id, label: c.name })) },
+                      ]}
+                      quickAddDefaults={{ companyId }}
+                      quickAddEndpoint="/api/expense-categories"
+                      onQuickAddSuccess={(item) => {
+                        const newCompanyId = item.companyId || companyId;
+                        setCategories((prev) => [...prev, { id: item.id, name: item.name, companyId: newCompanyId }]);
+                        patchRow(row.key, { categoryId: item.id, category: item.name });
+                        toastSuccess(t("common.addedSuccessfully"));
+                        notifyDataChanged(["expenses"]);
+                      }}
+                    />
+                    <input
+                      type="number"
+                      value={row.amount}
+                      onChange={(e) => patchRow(row.key, { amount: e.target.value })}
+                      placeholder={t("common.amount")}
+                      aria-label={t("common.amount")}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="0"
+                      step="0.01"
+                    />
+                    <textarea
+                      value={row.description}
+                      onChange={(e) => patchRow(row.key, { description: e.target.value })}
+                      placeholder={t("common.description")}
+                      aria-label={t("common.description")}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={2}
+                      required
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {!editingId && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addExpenseRow}
+                  disabled={rows.length >= MAX_EXPENSE_ROWS}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus size={15} />{t("finance.addRow")}
+                </button>
+                <span className="text-xs text-slate-400">{t("finance.maxRows")}</span>
+              </div>
+            )}
+
+            <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 flex flex-col gap-3 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+                <span className="text-slate-500">{t("finance.batchCount")}: <strong className="text-slate-800">{rows.length}</strong></span>
+                <span className="text-slate-500">{t("finance.batchTotal")}: <strong className="text-slate-900">{batchTotal.toLocaleString("ar-EG")} ج.م</strong></span>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"><X size={16} className="ms-1 inline-block" />{t("common.cancel")}</button>
+                <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 hover:bg-blue-700 text-white">{editingId ? <Save size={16} /> : <Plus size={16} />}</SubmitButton>
+              </div>
             </div>
           </form>
         </FormModal>
