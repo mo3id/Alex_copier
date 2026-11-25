@@ -128,7 +128,7 @@ setUsersLoaded(true);
       (!roleFilter || user.role === roleFilter) &&
       (matchesQuery(user.name, search) ||
         matchesQuery(user.phone, search) ||
-        matchesQuery(t(`roles.${user.role}`), search))
+        matchesQuery(roleLabel(user.role), search))
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
@@ -313,7 +313,7 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
               <FilterSelect
                 value={roleFilter}
                 onChange={(v) => { setRoleFilter(v); setPage(1); }}
-                options={ALL_ROLES.map((role) => ({ value: role, label: t(`roles.${role}`) }))}
+                options={ALL_ROLES.map((role) => ({ value: role, label: roleLabel(role) }))}
                 allLabel={`${t("settings.roleFilter")} — ${t("common.all")}`}
                 className="md:w-48"
               />
@@ -374,7 +374,7 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium ${ROLE_BADGES[user.role] || "bg-gray-100 text-gray-700"}`}>
-                              {t(`roles.${user.role}`)}
+                              {roleLabel(user.role)}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -600,7 +600,7 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
                 >
                   {ALL_ROLES.map((role) => (
-                    <option key={role} value={role}>{t(`roles.${role}`)}</option>
+                    <option key={role} value={role}>{roleLabel(role)}</option>
                   ))}
                 </select>
               </div>
