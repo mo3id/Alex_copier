@@ -1,4 +1,4 @@
-﻿-- Switch user identity from email to phone for login.
+-- Switch user identity from email to phone for login.
 ALTER TABLE "User" ADD COLUMN "phone" TEXT;
 
 -- Backfill deterministic distinct phones for existing users, preserving all rows.

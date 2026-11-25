@@ -14,13 +14,13 @@ const showTestAccounts = process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === "true";
 
 const testAccounts = [
   { name: "رضا", phone: "01000000001", password: "password123", role: "المدير العام — كل الصلاحيات", color: "bg-purple-100 text-purple-700" },
-  { name: "عمرو", phone: "01000000002", password: "password123", role: "مدير إداري — كل الصلاحيات", color: "bg-blue-100 text-blue-700" },
-  { name: "حاتم", phone: "01000000003", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-green-100 text-green-700" },
-  { name: "عمرو", phone: "01000000004", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-emerald-100 text-emerald-700" },
-  { name: "أحمد خالد", phone: "01000000005", password: "password123", role: "مدير الورشة", color: "bg-yellow-100 text-yellow-700" },
-  { name: "مؤمن", phone: "01000000006", password: "password123", role: "موظف مبيعات", color: "bg-pink-100 text-pink-700" },
-  { name: "مؤمن", phone: "01000000007", password: "password123", role: "موظف مبيعات", color: "bg-orange-100 text-orange-700" },
-  { name: "مؤمن", phone: "01000000008", password: "password123", role: "مهندس صيانة", color: "bg-cyan-100 text-cyan-700" },
+  { name: "عمرو", phone: "01000000056", password: "password123", role: "مدير شركة — كل الصلاحيات", color: "bg-blue-100 text-blue-700" },
+  { name: "عمرو", phone: "01000000003", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-green-100 text-green-700" },
+  { name: "حاتم", phone: "01000000055", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-emerald-100 text-emerald-700" },
+  { name: "علي خالد", phone: "01000000005", password: "password123", role: "مدير الورشة", color: "bg-yellow-100 text-yellow-700" },
+  { name: "أحمد خالد", phone: "01000000060", password: "password123", role: "مدير الورشة", color: "bg-amber-100 text-amber-700" },
+  { name: "فاطمة عبدالله", phone: "01000000006", password: "password123", role: "موظف مبيعات", color: "bg-pink-100 text-pink-700" },
+  { name: "مؤمن", phone: "01000000059", password: "password123", role: "مهندس صيانة", color: "bg-cyan-100 text-cyan-700" },
 ];
 
 export default function LoginPage() {
