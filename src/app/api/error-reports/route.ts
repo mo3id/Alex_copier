@@ -45,7 +45,7 @@ async function POST__raw(request: Request) {
         action: payload.action,
         details: payload.details,
         userId: actor?.id,
-        userEmail: typeof actor?.email === "string" ? actor.email : undefined,
+        userPhone: typeof (actor as any)?.phone === "string" ? (actor as any).phone : undefined,
       },
     });
     return NextResponse.json({ id: report.id }, { status: 201 });

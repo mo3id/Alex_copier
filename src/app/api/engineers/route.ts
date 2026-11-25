@@ -4,9 +4,9 @@ import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { ownEngineerId } from "@/lib/engineer-scope";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 const OPEN_STATUSES = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED"];
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function GET__raw() {
   try {
@@ -33,7 +33,7 @@ async function GET__raw() {
       include: {
         areas: true,
         skills: true,
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, phone: true } },
         serviceRequests: { select: { id: true, status: true } },
         _count: { select: { customers: true } },
       },
@@ -72,11 +72,12 @@ async function POST__raw(request: Request) {
     const name = String(data.name).trim();
     const linkUserId =
       typeof data.userId === "string" && data.userId !== "" ? data.userId : null;
-    const accountEmail =
-      typeof data.accountEmail === "string" ? data.accountEmail.trim().toLowerCase() : "";
+    const accountPhone = normalizePhone(
+      typeof data.accountPhone === "string" ? data.accountPhone : "",
+    );
     const accountPassword = typeof data.accountPassword === "string" ? data.accountPassword : "";
 
-    if (linkUserId && (accountEmail || accountPassword)) {
+    if (linkUserId && (accountPhone || accountPassword)) {
       return NextResponse.json(
         { error: "اختر إما ربط حساب موجود أو إنشاء حساب جديد — لا الاثنين معًا", code: "ACCOUNT_CHOICE_CONFLICT" },
         { status: 400 },
@@ -94,14 +95,14 @@ async function POST__raw(request: Request) {
       if (taken) return NextResponse.json({ error: "هذا الحساب مرتبط بمهندس آخر", code: "ACCOUNT_ALREADY_LINKED" }, { status: 409 });
       userId = linkedUser.id;
     } else {
-      if (!accountEmail || !accountPassword) {
+      if (!accountPhone || !accountPassword) {
         return NextResponse.json(
-          { error: "البريد الإلكتروني وكلمة المرور مطلوبان لإنشاء حساب المهندس", code: "ACCOUNT_FIELDS_REQUIRED" },
+          { error: "رقم التليفون وكلمة المرور مطلوبان لإنشاء حساب المهندس", code: "ACCOUNT_FIELDS_REQUIRED" },
           { status: 400 },
         );
       }
-      if (!EMAIL_REGEX.test(accountEmail)) {
-        return NextResponse.json({ error: "صيغة البريد الإلكتروني غير صحيحة", code: "INVALID_EMAIL" }, { status: 400 });
+      if (!isValidPhone(accountPhone)) {
+        return NextResponse.json({ error: "صيغة رقم التليفون غير صحيحة", code: "INVALID_PHONE" }, { status: 400 });
       }
       if (accountPassword.length < 6) {
         return NextResponse.json(
@@ -109,16 +110,16 @@ async function POST__raw(request: Request) {
           { status: 400 },
         );
       }
-      const emailTaken = await prisma.user.findUnique({ where: { email: accountEmail } });
-      if (emailTaken) {
-        return NextResponse.json({ error: "البريد الإلكتروني مستخدم بالفعل", code: "DUPLICATE_EMAIL" }, { status: 409 });
+      const phoneTaken = await prisma.user.findUnique({ where: { phone: accountPhone } });
+      if (phoneTaken) {
+        return NextResponse.json({ error: "رقم التليفون مستخدم بالفعل", code: "DUPLICATE_PHONE" }, { status: 409 });
       }
     }
 
     const passwordHash = !linkUserId ? await hash(accountPassword, 10) : null;
 
     delete data.userId;
-    delete data.accountEmail;
+    delete data.accountPhone;
     delete data.accountPassword;
 
     // Engineer + account are created atomically so no engineer ever exists
@@ -127,7 +128,7 @@ async function POST__raw(request: Request) {
       let linkedId = userId;
       if (!linkUserId) {
         const account = await tx.user.create({
-          data: { name, email: accountEmail, passwordHash: passwordHash as string, role: "ENGINEER" },
+          data: { name, phone: accountPhone, passwordHash: passwordHash as string, role: "ENGINEER" },
           select: { id: true },
         });
         linkedId = account.id;
@@ -157,11 +158,10 @@ async function POST__raw(request: Request) {
         include: {
           areas: true,
           skills: true,
-          user: { select: { id: true, name: true, email: true } },
+          user: { select: { id: true, name: true, phone: true } },
         },
       });
     });
-
     return NextResponse.json(engineer, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: "Failed to create engineer" }, { status: 500 });

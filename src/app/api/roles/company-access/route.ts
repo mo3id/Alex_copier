@@ -39,7 +39,7 @@ async function GET__raw() {
         select: {
           id: true,
           name: true,
-          email: true,
+          phone: true,
           role: true,
           companyId: true,
           companyAccess: { select: { companyId: true } },
@@ -64,7 +64,7 @@ async function GET__raw() {
         return {
           id: user.id,
           name: user.name,
-          email: user.email,
+          phone: user.phone,
           role: user.role,
           companyId: user.companyId,
           companyName: user.company?.nameAr || user.company?.name || null,

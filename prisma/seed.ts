@@ -155,16 +155,16 @@ async function main() {
   const passwordHash = await bcrypt.hash('password123', 10);
 
   const users = [
-    { id: 'user-reza', name: 'رضا', email: 'reza@alex-copier.com', role: 'GENERAL_MANAGER' as const, companyId: company1.id },
-    { id: 'user-sara', name: 'سارة محمد', email: 'sarah@jmal-ahlat.com', role: 'COMPANY_MANAGER' as const, companyId: company1.id },
-    { id: 'user-amr-accountant', name: 'عمرو', email: 'amr.accountant@alex-copier.com', role: 'ACCOUNTANT' as const, companyId: company1.id },
-    { id: 'user-amr-maintenance', name: 'عمرو', email: 'amr.maintenance@alex-copier.com', role: 'MAINTENANCE_MANAGER' as const, companyId: company1.id },
-    { id: 'user-ali', name: 'علي خالد', email: 'ali@alex-copier.com', role: 'WORKSHOP_MANAGER' as const, companyId: company1.id },
-    { id: 'user-fatma', name: 'فاطمة عبدالله', email: 'fatma@alex-copier.com', role: 'SALES_EMPLOYEE' as const, companyId: company1.id },
+    { id: 'user-reza', name: 'رضا', phone: '01000000001', role: 'GENERAL_MANAGER' as const, companyId: company1.id },
+    { id: 'user-sara', name: 'سارة محمد', phone: '01000000002', role: 'COMPANY_MANAGER' as const, companyId: company1.id },
+    { id: 'user-amr-accountant', name: 'عمرو', phone: '01000000003', role: 'ACCOUNTANT' as const, companyId: company1.id },
+    { id: 'user-amr-maintenance', name: 'عمرو', phone: '01000000004', role: 'MAINTENANCE_MANAGER' as const, companyId: company1.id },
+    { id: 'user-ali', name: 'علي خالد', phone: '01000000005', role: 'WORKSHOP_MANAGER' as const, companyId: company1.id },
+    { id: 'user-fatma', name: 'فاطمة عبدالله', phone: '01000000006', role: 'SALES_EMPLOYEE' as const, companyId: company1.id },
     // محاسب خاص بشركة جملة قطع غيار (company2)
-    { id: 'user-parts-accountant', name: 'كريم', email: 'parts.accountant@alex-copier.com', role: 'ACCOUNTANT' as const, companyId: company2.id },
+    { id: 'user-parts-accountant', name: 'كريم', phone: '01000000007', role: 'ACCOUNTANT' as const, companyId: company2.id },
     // محاسب خاص بشركة القطاعي (company3)
-    { id: 'user-sectory-accountant', name: 'مروة', email: 'sectory.accountant@alex-copier.com', role: 'ACCOUNTANT' as const, companyId: company3.id },
+    { id: 'user-sectory-accountant', name: 'مروة', phone: '01000000008', role: 'ACCOUNTANT' as const, companyId: company3.id },
   ];
 
   for (const u of users) {
@@ -279,23 +279,23 @@ async function main() {
   console.log('?? Creating engineers...');
 
   const engineersData = [
-    { id: 'eng-1', name: 'أحمد علي', phone: '010-1111-2222', email: 'ahmed.ali@alex-copier.com', baseSalary: 8000, transportAllowance: 2000, areas: ['الإسكندرية', 'وسط البلد'], skills: [{ model: 'Ricoh MP C3004', level: 3 }, { model: 'Canon imageRUNNER', level: 2 }] },
-    { id: 'eng-2', name: 'محمد حسن', phone: '011-2222-3333', email: 'mohamed.hassan@alex-copier.com', baseSalary: 9000, transportAllowance: 2500, areas: ['الرياض', 'الإسكندرية'], skills: [{ model: 'Xerox VersaLink', level: 3 }, { model: 'Sharp MX', level: 2 }] },
-    { id: 'eng-3', name: 'محمود إبراهيم', phone: '012-3333-4444', email: 'mahmoud.ibrahim@alex-copier.com', baseSalary: 8500, transportAllowance: 2200, areas: ['الإسكندرية', 'المعادي'], skills: [{ model: 'Konica Minolta bizhub', level: 3 }] },
-    { id: 'eng-4', name: 'حسن خالد', phone: '015-4444-5555', email: 'hassan.khaled@alex-copier.com', baseSalary: 7500, transportAllowance: 1800, areas: ['مكتب العدل', 'الجيش'], skills: [{ model: 'Ricoh MP C4504', level: 3 }] },
-    { id: 'eng-5', name: 'عمرو سعيد', phone: '010-5555-6666', email: 'omar.saeed@alex-copier.com', baseSalary: 8000, transportAllowance: 2000, areas: ['القاهرة', 'وسط البلد'], skills: [{ model: 'Canon imageRUNNER ADVANCE', level: 3 }] },
-    { id: 'eng-6', name: 'ياسر محمد', phone: '011-6666-7777', email: 'yasser.mohamed@alex-copier.com', baseSalary: 7000, transportAllowance: 1500, areas: ['المعادي', 'شارع الجيش'], skills: [{ model: 'Xerox WorkCentre', level: 2 }] },
+    { id: 'eng-1', name: 'أحمد علي', phone: '010-1111-2222', phone: '01000000101', baseSalary: 8000, transportAllowance: 2000, areas: ['الإسكندرية', 'وسط البلد'], skills: [{ model: 'Ricoh MP C3004', level: 3 }, { model: 'Canon imageRUNNER', level: 2 }] },
+    { id: 'eng-2', name: 'محمد حسن', phone: '011-2222-3333', phone: '01000000102', baseSalary: 9000, transportAllowance: 2500, areas: ['الرياض', 'الإسكندرية'], skills: [{ model: 'Xerox VersaLink', level: 3 }, { model: 'Sharp MX', level: 2 }] },
+    { id: 'eng-3', name: 'محمود إبراهيم', phone: '012-3333-4444', phone: '01000000103', baseSalary: 8500, transportAllowance: 2200, areas: ['الإسكندرية', 'المعادي'], skills: [{ model: 'Konica Minolta bizhub', level: 3 }] },
+    { id: 'eng-4', name: 'حسن خالد', phone: '015-4444-5555', phone: '01000000104', baseSalary: 7500, transportAllowance: 1800, areas: ['مكتب العدل', 'الجيش'], skills: [{ model: 'Ricoh MP C4504', level: 3 }] },
+    { id: 'eng-5', name: 'عمرو سعيد', phone: '010-5555-6666', phone: '01000000105', baseSalary: 8000, transportAllowance: 2000, areas: ['القاهرة', 'وسط البلد'], skills: [{ model: 'Canon imageRUNNER ADVANCE', level: 3 }] },
+    { id: 'eng-6', name: 'ياسر محمد', phone: '011-6666-7777', phone: '01000000106', baseSalary: 7000, transportAllowance: 1500, areas: ['المعادي', 'شارع الجيش'], skills: [{ model: 'Xerox WorkCentre', level: 2 }] },
   ];
 
   const createdEngineers: Awaited<ReturnType<typeof prisma.engineer.create>>[] = [];
   for (const engData of engineersData) {
     const engineerUser = await prisma.user.upsert({
-      where: { email: engData.email },
+      where: { phone: engData.phone },
       update: { name: engData.name, role: 'ENGINEER', isActive: true },
       create: {
         id: `user-${engData.id}`,
         name: engData.name,
-        email: engData.email,
+        phone: engData.phone,
         passwordHash,
         role: 'ENGINEER',
         companyId: null,
@@ -308,7 +308,7 @@ async function main() {
         userId: engineerUser.id,
         name: engData.name,
         phone: engData.phone,
-        email: engData.email,
+        phone: engData.phone,
         baseSalary: engData.baseSalary,
         transportAllowance: engData.transportAllowance,
         areas: { create: engData.areas.map((a) => ({ areaName: a })) },

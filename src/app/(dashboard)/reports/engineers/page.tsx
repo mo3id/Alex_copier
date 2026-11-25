@@ -8,7 +8,7 @@ import { moneyFormatter, numberFormatter } from "@/components/reports/format";
 interface Row {
   id: string;
   name: string;
-  user: { id: string; name: string; email: string } | null;
+  user: { id: string; name: string; phone: string } | null;
   areas: string[];
   skills: string[];
   baseSalary: number;
@@ -32,12 +32,12 @@ export default function EngineerPerformancePage() {
           r.user ? (
             <span className="text-sm">
               {r.user.name}
-              <span className="block text-xs text-slate-500">{r.user.email}</span>
+              <span className="block text-xs text-slate-500" dir="ltr">{r.user.phone}</span>
             </span>
           ) : (
             <span className="text-xs text-slate-400">{t("reports.noLinkedAccount")}</span>
           ),
-        exportValue: (r) => r.user?.email ?? "",
+        exportValue: (r) => r.user?.phone ?? "",
       },
       {
         key: "areas",
@@ -95,7 +95,7 @@ export default function EngineerPerformancePage() {
       summary={summary}
       refreshDeps={["engineers", "service-requests"]}
       searchPlaceholder={`${t("common.search")} ${t("reports.engineer")}...`}
-      searchFields={(r) => [r.name, r.user?.name, r.user?.email, ...r.areas, ...r.skills]}
+      searchFields={(r) => [r.name, r.user?.name, r.user?.phone, ...r.areas, ...r.skills]}
     />
   );
 }

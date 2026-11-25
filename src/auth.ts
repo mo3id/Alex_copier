@@ -9,28 +9,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
+        phone: { label: "Phone", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        const phone = typeof credentials?.phone === "string" ? credentials.phone.trim() : "";
+        const password = typeof credentials?.password === "string" ? credentials.password : "";
+        if (!phone || !password) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { phone },
         });
 
         if (!user || !user.isActive) return null;
 
-        const isValid = await compare(
-          credentials.password as string,
-          user.passwordHash,
-        );
+        const isValid = await compare(password, user.passwordHash);
         if (!isValid) return null;
 
         return {
           id: user.id,
           name: user.name,
-          email: user.email,
+          phone: user.phone,
           role: user.role,
           companyId: user.companyId,
         };
@@ -44,6 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.role = (user as { role: string }).role;
         token.companyId = (user as { companyId: string | null }).companyId;
+        token.phone = (user as { phone?: string }).phone;
       }
       return token;
     },
@@ -53,6 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as { role: string }).role = token.role as string;
         (session.user as { companyId: string | null }).companyId =
           token.companyId as string | null;
+        (session.user as { phone?: string }).phone = token.phone as string | undefined;
       }
       return session;
     },

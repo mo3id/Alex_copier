@@ -19,7 +19,7 @@ async function GET__raw() {
     const [users, engineers] = await Promise.all([
       prisma.user.findMany({
         where: { role: "ENGINEER", isActive: true },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, phone: true },
         orderBy: { name: "asc" },
       }),
       prisma.engineer.findMany({

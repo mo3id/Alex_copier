@@ -70,14 +70,14 @@ async function main() {
     });
   }
   const gm = await prisma.user.upsert({
-    where: { email: "reza@alex-copier.com" },
+    where: { phone: "01000000001" },
     update: { isActive: true },
-    create: { id: "user-reza", name: "رضا", email: "reza@alex-copier.com", passwordHash, role: "GENERAL_MANAGER", companyId: company.id },
+    create: { id: "user-reza", name: "رضا", phone: "01000000001", passwordHash, role: "GENERAL_MANAGER", companyId: company.id },
   });
   await prisma.user.upsert({
-    where: { email: "accountant@alex-copier.com" },
+    where: { phone: "01000000009" },
     update: { isActive: true },
-    create: { id: "user-accountant", name: "المحاسب", email: "accountant@alex-copier.com", passwordHash, role: "ACCOUNTANT", companyId: company.id },
+    create: { id: "user-accountant", name: "المحاسب", phone: "01000000009", passwordHash, role: "ACCOUNTANT", companyId: company.id },
   });
   console.log(`Base company=${company.id}`);
 
@@ -87,16 +87,16 @@ async function main() {
   for (const shortName of allEngineerShortNames()) {
     const seed = resolveEngineer(shortName);
     if (!seed) continue;
-    const email = engineerEmail(seed.slug);
+    const phone = seed.phone;
     const user = await prisma.user.upsert({
-      where: { email },
+      where: { phone },
       update: { name: seed.name, role: "ENGINEER", isActive: true },
-      create: { name: seed.name, email, passwordHash, role: "ENGINEER" },
+      create: { name: seed.name, phone, passwordHash, role: "ENGINEER" },
     });
     let eng = await prisma.engineer.findFirst({ where: { name: seed.name } });
     if (!eng) {
       eng = await prisma.engineer.create({
-        data: { id: `eng-acc-${seed.slug}`, name: seed.name, phone: seed.phone, nationalId: seed.nationalId, email, userId: user.id },
+        data: { id: `eng-acc-${seed.slug}`, name: seed.name, phone: seed.phone, nationalId: seed.nationalId, userId: user.id },
       });
     } else if (!eng.userId) {
       eng = await prisma.engineer.update({ where: { id: eng.id }, data: { userId: user.id } });
@@ -507,7 +507,7 @@ async function main() {
     prisma.copierTest.count({ where: { OR: [{ id: { startsWith: "acct-" } }, { id: { startsWith: "accp-" } }] } }),
     prisma.contract.count({ where: { contractNumber: { startsWith: "ACC-" } } }),
     prisma.settlement.count({ where: { settlementNumber: { startsWith: "ACC-STL-" } } }),
-    prisma.user.count({ where: { email: { startsWith: "eng-" } } }),
+    prisma.user.count({ where: { role: "ENGINEER" } }),
     prisma.engineer.count({ where: { id: { startsWith: "eng-acc-" } } }),
   ]);
   console.log("VERIFY:", JSON.stringify({ customers: cCust, machines: cMach, tests: cTest, contracts: cCont, settlements: cStl, engUsers: cUser, engineers: cEng }));

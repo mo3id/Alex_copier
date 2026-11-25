@@ -188,12 +188,12 @@ async function main() {
 
   // Ensure Accountant User
   const hatemUser = await prisma.user.upsert({
-    where: { email: "hatem@alex-copier.com" },
+    where: { phone: "01000000010" },
     update: { name: "حاتم المحاسب", role: "ACCOUNTANT" },
     create: {
       id: "user-hatem",
       name: "حاتم المحاسب",
-      email: "hatem@alex-copier.com",
+      phone: "01000000010",
       passwordHash,
       role: "ACCOUNTANT",
       companyId: company1.id,
@@ -206,7 +206,7 @@ async function main() {
     code: string;
     fingerprintId?: string;
     fullName: string;
-    email?: string;
+    phone?: string;
     hireDate: Date;
     employmentType?: EmpType;
     baseSalary: number;
@@ -221,7 +221,7 @@ async function main() {
       fingerprintId: data.fingerprintId ?? null,
       fullName: data.fullName,
       fullNameAr: data.fullName,
-      email: data.email ?? null,
+      phone: data.phone ?? null,
       hireDate: data.hireDate,
       employmentType: (data.employmentType ?? "FULL_TIME") as EmpType,
       baseSalary: data.baseSalary,
@@ -252,7 +252,7 @@ async function main() {
     code: "EMP-GM-001",
     fingerprintId: "001",
     fullName: "رضا عبد الرحمن",
-    email: "reza@alex-copier.com",
+    phone: "01000000001",
     hireDate: new Date("2020-01-01"),
     baseSalary: 25000,
     departmentId: deptGEN.id,
@@ -267,7 +267,7 @@ async function main() {
     code: "EMP-ACC-001",
     fingerprintId: "010",
     fullName: "عمرو السعدني",
-    email: "amr.accountant@alex-copier.com",
+    phone: "01000000003",
     hireDate: new Date("2021-03-01"),
     baseSalary: 12000,
     departmentId: deptACC.id,
@@ -282,7 +282,7 @@ async function main() {
     code: "EMP-ACC-002",
     fingerprintId: "011",
     fullName: "حاتم عثمان",
-    email: "hatem@alex-copier.com",
+    phone: "01000000010",
     hireDate: new Date("2022-01-15"),
     baseSalary: 10000,
     departmentId: deptACC.id,
@@ -297,7 +297,7 @@ async function main() {
     code: "EMP-ADM-001",
     fingerprintId: "020",
     fullName: "عمرو الإداري",
-    email: "amr.maintenance@alex-copier.com",
+    phone: "01000000004",
     hireDate: new Date("2021-06-01"),
     baseSalary: 15000,
     departmentId: deptADM.id,
@@ -311,7 +311,7 @@ async function main() {
     code: "EMP-ENG-001",
     fingerprintId: "101",
     fullName: "أحمد علي",
-    email: "ahmed.ali@alex-copier.com",
+    phone: "01000000101",
     hireDate: new Date("2021-02-01"),
     baseSalary: 8000,
     departmentId: deptENG.id,
@@ -325,7 +325,7 @@ async function main() {
     code: "EMP-ENG-002",
     fingerprintId: "102",
     fullName: "محمد حسن",
-    email: "mohamed.hassan@alex-copier.com",
+    phone: "01000000102",
     hireDate: new Date("2021-03-15"),
     baseSalary: 9000,
     departmentId: deptENG.id,
@@ -339,7 +339,7 @@ async function main() {
     code: "EMP-ENG-003",
     fingerprintId: "103",
     fullName: "محمود إبراهيم",
-    email: "mahmoud.ibrahim@alex-copier.com",
+    phone: "01000000103",
     hireDate: new Date("2020-11-01"),
     baseSalary: 8500,
     departmentId: deptENG.id,

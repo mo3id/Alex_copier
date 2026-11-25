@@ -3,33 +3,29 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Printer, Mail, Lock, LogIn, User, Shield } from "lucide-react";
+import { Printer, Phone, Lock, LogIn, User, Shield } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 
 /**
- * Quick-login buttons for the seeded demo accounts.
- *
- * These sign in as real, privileged accounts (including the general manager)
- * with a shared password, so the panel is opt-in through the deployment: it
- * renders only when NEXT_PUBLIC_SHOW_TEST_ACCOUNTS is exactly "true", and stays
- * hidden when the variable is unset or set to anything else.
+ * Quick-login buttons for seeded/demo accounts.
+ * Opt-in only through NEXT_PUBLIC_SHOW_TEST_ACCOUNTS="true".
  */
 const showTestAccounts = process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === "true";
 
 const testAccounts = [
-  { name: "رضا", email: "reza@alex-copier.com", password: "password123", role: "المدير العام — كل حاجة في السيستم", color: "bg-purple-100 text-purple-700" },
-  { name: "عمرو", email: "amr.manager@alex-copier.com", password: "password123", role: "مدير إداري — شركة القطاعي + الورشة", color: "bg-blue-100 text-blue-700" },
-  { name: "حاتم", email: "hatem.accountant@alex-copier.com", password: "password123", role: "محاسب — كل حاجة في السيستم", color: "bg-green-100 text-green-700" },
-  { name: "عمرو", email: "amr.accountant@alex-copier.com", password: "password123", role: "محاسب — كل حاجة في السيستم", color: "bg-emerald-100 text-emerald-700" },
-  { name: "أحمد خالد", email: "ahmed.khaled@alex-copier.com", password: "password123", role: "الورشة — تسجيل الاختبارات + يومية الورشة", color: "bg-yellow-100 text-yellow-700" },
-  { name: "مؤمن", email: "moemen.sales.parts@alex-copier.com", password: "password123", role: "موظف مبيعات — شركة جملة قطع غيار", color: "bg-pink-100 text-pink-700" },
-  { name: "مؤمن", email: "moemen.sales.machines@alex-copier.com", password: "password123", role: "موظف مبيعات — شركة جملة آلات", color: "bg-orange-100 text-orange-700" },
-  { name: "مؤمن", email: "moemen.engineer@alex-copier.com", password: "password123", role: "مهندس صيانة", color: "bg-cyan-100 text-cyan-700" },
+  { name: "رضا", phone: "01000000001", password: "password123", role: "المدير العام — كل الصلاحيات", color: "bg-purple-100 text-purple-700" },
+  { name: "عمرو", phone: "01000000002", password: "password123", role: "مدير إداري — كل الصلاحيات", color: "bg-blue-100 text-blue-700" },
+  { name: "حاتم", phone: "01000000003", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-green-100 text-green-700" },
+  { name: "عمرو", phone: "01000000004", password: "password123", role: "محاسب — كل الصلاحيات", color: "bg-emerald-100 text-emerald-700" },
+  { name: "أحمد خالد", phone: "01000000005", password: "password123", role: "مدير الورشة", color: "bg-yellow-100 text-yellow-700" },
+  { name: "مؤمن", phone: "01000000006", password: "password123", role: "موظف مبيعات", color: "bg-pink-100 text-pink-700" },
+  { name: "مؤمن", phone: "01000000007", password: "password123", role: "موظف مبيعات", color: "bg-orange-100 text-orange-700" },
+  { name: "مؤمن", phone: "01000000008", password: "password123", role: "مهندس صيانة", color: "bg-cyan-100 text-cyan-700" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,13 +36,13 @@ export default function LoginPage() {
     setError("");
 
     const result = await signIn("credentials", {
-      email,
+      phone: phone.trim(),
       password,
       redirect: false,
     });
 
     if (result?.error) {
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
+      setError("رقم التليفون أو كلمة المرور غير صحيحة");
     } else {
       router.push("/");
       return;
@@ -55,12 +51,12 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const handleTestLogin = async (testEmail: string, testPassword: string) => {
+  const handleTestLogin = async (testPhone: string, testPassword: string) => {
     setLoading(true);
     setError("");
 
     const result = await signIn("credentials", {
-      email: testEmail,
+      phone: testPhone,
       password: testPassword,
       redirect: false,
     });
@@ -97,18 +93,21 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">البريد الإلكتروني</label>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">رقم التليفون</label>
                 <div className="relative">
                   <input
-                    id="email"
-                    type="email"
+                    id="phone"
+                    type="tel"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full ps-10 pe-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-start text-base sm:text-sm"
-                    placeholder="example@alex-copier.com"
+                    placeholder="01xxxxxxxxx"
+                    dir="ltr"
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
-                  <Mail size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Phone size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
@@ -164,8 +163,8 @@ export default function LoginPage() {
           <div className="space-y-3">
             {testAccounts.map((account) => (
               <button
-                key={account.email}
-                onClick={() => handleTestLogin(account.email, account.password)}
+                key={account.phone}
+                onClick={() => handleTestLogin(account.phone, account.password)}
                 disabled={loading}
                 className="w-full flex items-center gap-4 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-4 transition-all text-start disabled:opacity-50 group"
               >
@@ -179,7 +178,7 @@ export default function LoginPage() {
                       {account.role}
                     </span>
                   </div>
-                  <p className="text-gray-400 text-xs truncate">{account.email}</p>
+                  <p className="text-gray-400 text-xs truncate" dir="ltr">{account.phone}</p>
                 </div>
                 <LogIn size={18} className="text-gray-500 group-hover:text-blue-400 transition-colors flex-shrink-0" />
               </button>

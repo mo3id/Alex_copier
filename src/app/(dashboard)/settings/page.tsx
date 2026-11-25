@@ -21,7 +21,7 @@ import { notifyDataChanged } from "@/lib/data-events";
 interface User {
   id: string;
   name: string;
-  email: string;
+  phone: string;
   role: string;
   companyId: string | null;
   isActive: boolean;
@@ -42,7 +42,7 @@ const ALL_ROLES = Object.keys(ROLE_BADGES);
 
 const emptyForm = {
   name: "",
-  email: "",
+  phone: "",
   password: "",
   role: "SALES_EMPLOYEE",
   companyId: "",
@@ -127,7 +127,7 @@ setUsersLoaded(true);
     (user) =>
       (!roleFilter || user.role === roleFilter) &&
       (matchesQuery(user.name, search) ||
-        matchesQuery(user.email, search) ||
+        matchesQuery(user.phone, search) ||
         matchesQuery(t(`roles.${user.role}`), search))
   );
 
@@ -147,7 +147,7 @@ setUsersLoaded(true);
     setEditingUser(user);
     setForm({
       name: user.name,
-      email: user.email,
+      phone: user.phone,
       password: "",
       role: user.role,
       companyId: user.companyId || "",
@@ -166,7 +166,7 @@ setUsersLoaded(true);
       const isEdit = Boolean(editingUser);
       const payload: Record<string, unknown> = {
         name: form.name,
-        email: form.email,
+        phone: form.phone,
         role: form.role,
         companyId: form.companyId || null,
       };
@@ -198,7 +198,7 @@ setModalOpen(false);
   const toggleStatus = async (user: User) => {
     if (
       !(await confirmAction({
-        message: `${t("settings.toggleStatusConfirm")}\n${user.name} — ${user.email}`,
+        message: `${t("settings.toggleStatusConfirm")}\n${user.name} — ${user.phone}`,
       }))
     )
       return;
@@ -227,7 +227,7 @@ setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: !user.i
       return;
     }
 
-    if (!(await confirmAction({ message: `${t("common.deleteConfirm")}\n${user.name} — ${user.email}` }))) {
+    if (!(await confirmAction({ message: `${t("common.deleteConfirm")}\n${user.name} — ${user.phone}` }))) {
       return;
     }
 
@@ -368,7 +368,7 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                                     </span>
                                   )}
                                 </p>
-                                <p className="text-xs text-gray-500 truncate" dir="ltr">{user.email}</p>
+                                <p className="text-xs text-gray-500 truncate" dir="ltr">{user.phone}</p>
                               </div>
                             </div>
                           </td>
@@ -544,19 +544,18 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
               </div>
 
               <div>
-                <label htmlFor="user-email" className="mb-1 block text-sm font-medium text-gray-700">{t("customers.email")}</label>
+                <label htmlFor="user-phone" className="mb-1 block text-sm font-medium text-gray-700">رقم التليفون</label>
                 <input
-                  id="user-email"
-                  type="email"
+                  id="user-phone"
+                  type="tel"
                   required
                   dir="ltr"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  disabled={Boolean(editingUser)}
-                  className={`w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none ${
-                    editingUser ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""
-                  }`}
-                  autoComplete="off"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="01xxxxxxxxx"
                 />
               </div>
 

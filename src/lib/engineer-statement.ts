@@ -17,7 +17,6 @@ export interface EngineerStatement {
   engineerId: string;
   engineerName: string;
   phone: string | null;
-  email: string | null;
   isActive: boolean;
   baseSalary: number;
   transportAllowance: number;
@@ -108,7 +107,6 @@ export interface EngineerBase {
   id: string;
   name: string;
   phone: string | null;
-  email: string | null;
   isActive: boolean;
   baseSalary: number;
   transportAllowance: number;
@@ -242,7 +240,6 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
     engineerId: engineer.id,
     engineerName: engineer.name,
     phone: engineer.phone,
-    email: engineer.email,
     isActive: engineer.isActive,
     baseSalary: engineer.baseSalary,
     transportAllowance: engineer.transportAllowance,
@@ -291,7 +288,6 @@ export async function buildEngineerStatement(
       id: true,
       name: true,
       phone: true,
-      email: true,
       isActive: true,
       baseSalary: true,
       transportAllowance: true,

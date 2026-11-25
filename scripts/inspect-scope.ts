@@ -7,7 +7,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: proc
 async function main() {
   const key = await prisma.user.findMany({
     where: { email: { in: ["reza@alex-copier.com", "amr.accountant@alex-copier.com", "hatem.accountant@alex-copier.com", "amr.manager@alex-copier.com", "amr.maintenance@alex-copier.com", "accountant@alex-copier.com"] } },
-    select: { name: true, email: true, role: true, companyId: true, company: { select: { name: true } } },
+    select: { name: true, phone: true, role: true, companyId: true, company: { select: { name: true } } },
   });
   console.log("=== named accounts and their company ===");
   key.forEach((u) => console.log(`  ${u.name.padEnd(10)} ${u.email.padEnd(34)} ${u.role.padEnd(18)} company=${u.companyId ?? "NULL"} (${u.company?.name ?? "-"})`));

@@ -17,7 +17,7 @@ interface ErrorReport {
   requestId?: string | null;
   path?: string | null;
   action?: string | null;
-  userEmail?: string | null;
+  userPhone?: string | null;
   createdAt: string;
 }
 

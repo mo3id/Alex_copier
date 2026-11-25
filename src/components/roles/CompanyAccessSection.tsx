@@ -18,7 +18,7 @@ interface CompanyOption {
 interface UserAccessRow {
   id: string;
   name: string;
-  email: string;
+  phone: string;
   role: string;
   roleName: string | null;
   companyId: string | null;
@@ -111,7 +111,7 @@ export default function CompanyAccessSection() {
     return users.filter(
       (user) =>
         user.name.toLowerCase().includes(needle) ||
-        user.email.toLowerCase().includes(needle)
+        user.phone.toLowerCase().includes(needle)
     );
   }, [users, query]);
 
@@ -250,8 +250,8 @@ export default function CompanyAccessSection() {
                     <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {user.name}
                     </p>
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {user.email}
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400" dir="ltr">
+                      {user.phone}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">

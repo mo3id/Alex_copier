@@ -73,7 +73,7 @@ function serialize<T extends { createdAt: Date; updatedAt: Date; readAt: Date | 
 
 const notificationInclude = {
   sender: {
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, phone: true },
   },
 } as const;
 

@@ -45,7 +45,7 @@ async function GET__raw(request: Request) {
       include: {
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true, startTime: true, endTime: true } },
-        User: { select: { id: true, email: true, name: true, role: true } },
+        User: { select: { id: true, phone: true, name: true, role: true } },
       },
     });
 

@@ -68,7 +68,7 @@ export const ERROR_CATALOG: Record<string, ErrorDefinition> = {
     en: "The value you entered is already in use (duplicate unique field). Use a different value.",
     status: 409,
     hintAr: "غالباً الاسم أو البريد الإلكتروني أو الكود مكرر.",
-    hintEn: "Usually the name, email or code is duplicated.",
+    hintEn: "Usually the name, phone or code is duplicated.",
   },
   P2025: {
     ar: "السجل المطلوب غير موجود في قاعدة البيانات. حدّث الصفحة ثم أعد المحاولة.",
@@ -94,7 +94,7 @@ export const ERROR_CATALOG: Record<string, ErrorDefinition> = {
   // ---- Auth / RBAC ----
   INVALID_CREDENTIALS: {
     ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
-    en: "The email or password is incorrect.",
+    en: "The phone number or password is incorrect.",
     status: 401,
   },
   ACCOUNT_INACTIVE: {

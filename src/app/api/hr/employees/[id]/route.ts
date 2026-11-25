@@ -25,7 +25,7 @@ async function GET__raw(
       include: {
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true, startTime: true, endTime: true } },
-        User: { select: { id: true, email: true, name: true, role: true } },
+        User: { select: { id: true, phone: true, name: true, role: true } },
         SalaryHistory: { orderBy: { createdAt: "desc" } },
         SalaryComponents: { include: { SalaryComponent: true } },
         TraineeInfo: true,

@@ -32,7 +32,7 @@ interface EngineerSkill {
 interface LinkedUser {
   id: string;
   name: string;
-  email: string;
+  phone: string;
 }
 
 interface SalesOrder {
@@ -50,7 +50,6 @@ interface Engineer {
   id: string;
   name: string;
   phone: string;
-  email: string;
   baseSalary: number;
   transportAllowance: number;
   commissionRate: number;
@@ -66,14 +65,14 @@ interface Engineer {
 interface LinkableUser {
   id: string;
   name: string;
-  email: string;
+  phone: string;
   linkedEngineerId: string | null;
 }
 
 const emptyForm = {
   name: "",
   phone: "",
-  email: "",
+
   baseSalary: "",
   transportAllowance: "",
   commissionRate: "",
@@ -173,7 +172,7 @@ export default function EngineersPage() {
     setForm({
       name: engineer.name,
       phone: engineer.phone || "",
-      email: engineer.email || "",
+
       baseSalary: String(engineer.baseSalary || ""),
       transportAllowance: String(engineer.transportAllowance || ""),
       commissionRate: String(engineer.commissionRate || ""),
@@ -217,7 +216,7 @@ export default function EngineersPage() {
   const filtered = engineers.filter(
     (e) =>
       matchesQuery(e.name, search) ||
-      matchesQuery(e.email, search) ||
+
       matchesQuery(e.areas.map((a) => a.areaName).join(" "), search) ||
       matchesQuery(e.skills.map((s) => s.modelType).join(" "), search) ||
       (Boolean(e.phone) && e.phone.includes(search))
@@ -240,7 +239,7 @@ export default function EngineersPage() {
     headers: [
       t("engineers.name"),
       t("customers.phone"),
-      t("customers.email"),
+      "Ø±Ù‚Ù… Ø§Ù„ØªÙ„ÙŠÙÙˆÙ†",
       t("engineers.baseSalary"),
       t("engineers.transportAllowance"),
       t("engineers.commissionRate"),
@@ -254,16 +253,16 @@ export default function EngineersPage() {
     rows: filtered.map((e) => [
       e.name,
       e.phone || "",
-      e.email || "",
+
       String(e.baseSalary),
       String(e.transportAllowance),
       String(e.commissionRate),
-      e.areas.map((a) => a.areaName).join("، "),
-      e.skills.map((s) => `${s.modelType} (${s.skillLevel})`).join("، "),
+      e.areas.map((a) => a.areaName).join("ØŒ "),
+      e.skills.map((s) => `${s.modelType} (${s.skillLevel})`).join("ØŒ "),
       e.user?.name || "",
       String(e.openAssignedCount ?? 0),
       String(e.assignedCustomersCount ?? 0),
-      e.isActive ? "نعم" : "لا",
+      e.isActive ? "Ù†Ø¹Ù…" : "Ù„Ø§",
     ]),
   });
 
@@ -273,7 +272,7 @@ export default function EngineersPage() {
     const body = {
       name: form.name,
       phone: form.phone || null,
-      email: form.email || null,
+
       baseSalary: form.baseSalary ? parseFloat(form.baseSalary) : 8000,
       transportAllowance: form.transportAllowance ? parseFloat(form.transportAllowance) : 2000,
       commissionRate: form.commissionRate ? parseFloat(form.commissionRate) : 25,
@@ -304,7 +303,7 @@ export default function EngineersPage() {
       ...prev,
       userId,
       name: prev.name || selectedUser?.name || "",
-      email: prev.email || selectedUser?.email || "",
+
     }));
   };
 
@@ -354,7 +353,7 @@ export default function EngineersPage() {
         stats={[
           { label: t("engineers.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
           { label: t("engineers.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
-          { label: t("engineers.stats.salaries"), value: `${stats.salaries.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "purple" },
+          { label: t("engineers.stats.salaries"), value: `${stats.salaries.toLocaleString("ar-EG")} Ø¬.Ù…`, icon: <Wallet size={18} />, tone: "purple" },
           { label: t("engineers.stats.openRequests"), value: stats.openRequests.toLocaleString("ar-EG"), icon: <ClipboardList size={18} />, tone: "amber" },
         ]}
       />
@@ -370,8 +369,8 @@ export default function EngineersPage() {
             <input type="text" value={form.phone} onChange={(e) => setField("phone", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-slate-700">{t("customers.email")}</label>
-            <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="block text-sm font-medium text-slate-700">"Ø±Ù‚Ù… Ø§Ù„ØªÙ„ÙŠÙÙˆÙ†"</label>
+            <input type="tel" dir="ltr" value={form.phone} onChange={(e) => setField("phone", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="01xxxxxxxxx" />
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("engineers.linkedAccount")}</label>
@@ -382,7 +381,7 @@ export default function EngineersPage() {
             >
               <option value="">{t("engineers.selectAccountOptional")}</option>
               {linkableUsers.filter((u) => !u.linkedEngineerId).map((u) => (
-                <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
+                <option key={u.id} value={u.id}>{u.name} â€” {u.phone}</option>
               ))}
             </select>
           </div>
@@ -392,7 +391,7 @@ export default function EngineersPage() {
               <div className="font-medium mb-1">{t("engineers.selectedAccount")}</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <div><span className="font-medium">{t("engineers.name")}: </span>{selectedAccount.name}</div>
-                <div><span className="font-medium">{t("customers.email")}: </span>{selectedAccount.email}</div>
+                <div><span className="font-medium">Ø±Ù‚Ù… Ø§Ù„ØªÙ„ÙŠÙÙˆÙ†: </span><span dir="ltr"><span dir="ltr">{selectedAccount.phone}</span></span></div>
                 <div className="md:col-span-2"><span className="font-medium">{t("settings.password")}: </span>{t("engineers.passwordHidden")}</div>
               </div>
             </div>
@@ -413,7 +412,7 @@ export default function EngineersPage() {
             <label className="block text-sm font-medium text-slate-700">{t("engineers.areas")}</label>
             <input
               type="text"
-              placeholder={locale === "ar" ? "مفصولة بفاصلة" : "comma separated"}
+              placeholder={locale === "ar" ? "Ù…ÙØµÙˆÙ„Ø© Ø¨ÙØ§ØµÙ„Ø©" : "comma separated"}
               value={form.areas}
               onChange={(e) => setField("areas", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -430,8 +429,8 @@ export default function EngineersPage() {
         {selected && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 text-sm mb-4">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.email")}</span><span className="mt-1 block font-medium text-slate-800">{selected.email || selected.user?.email || "—"}</span></div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "â€”"}</span></div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">"Ø±Ù‚Ù… Ø§Ù„ØªÙ„ÙŠÙÙˆÙ†"</span><span className="mt-1 block font-medium text-slate-800"><span dir="ltr">{selected.user?.phone || selected.phone || "â€”"}</span></span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.baseSalary")}</span><span className="mt-1 block font-medium text-slate-800">{selected.baseSalary.toLocaleString()}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.transportAllowance")}</span><span className="mt-1 block font-medium text-slate-800">{selected.transportAllowance.toLocaleString()}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.commissionRate")}</span><span className="mt-1 block font-medium text-slate-800">{selected.commissionRate}%</span></div>
@@ -456,7 +455,7 @@ export default function EngineersPage() {
                 <div className="flex flex-wrap gap-2">
                   {selected.skills.map((skill) => (
                     <span key={skill.id} className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      {skill.modelType} ({locale === "ar" ? "مستوى" : "level"} {skill.skillLevel})
+                      {skill.modelType} ({locale === "ar" ? "Ù…Ø³ØªÙˆÙ‰" : "level"} {skill.skillLevel})
                     </span>
                   ))}
                 </div>
@@ -498,9 +497,9 @@ export default function EngineersPage() {
                       {engineerSales.map((sale) => (
                         <tr key={sale.id} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5 text-sm font-medium">{sale.orderNumber}</td>
-                          <td className="px-4 py-2.5 text-sm">{sale.customer?.name || "—"}</td>
-                          <td className="px-4 py-2.5 text-sm">{sale.company?.nameAr || sale.company?.name || "—"}</td>
-                          <td className="px-4 py-2.5 text-sm">{sale.items?.map((item) => item.product?.name).filter(Boolean).join(", ") || "—"}</td>
+                          <td className="px-4 py-2.5 text-sm">{sale.customer?.name || "â€”"}</td>
+                          <td className="px-4 py-2.5 text-sm">{sale.company?.nameAr || sale.company?.name || "â€”"}</td>
+                          <td className="px-4 py-2.5 text-sm">{sale.items?.map((item) => item.product?.name).filter(Boolean).join(", ") || "â€”"}</td>
                           <td className="px-4 py-2.5 text-sm font-semibold">{sale.total.toLocaleString()}</td>
                           <td className="px-4 py-2.5 text-sm text-gray-500"><DateTimeCell value={sale.orderDate} /></td>
                         </tr>
@@ -562,7 +561,7 @@ export default function EngineersPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.name")}</th>
-                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.email")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">"Ø±Ù‚Ù… Ø§Ù„ØªÙ„ÙŠÙÙˆÙ†"</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.phone")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.baseSalary")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.transportAllowance")}</th>
@@ -582,8 +581,8 @@ export default function EngineersPage() {
                     onClick={() => openEngineerDetail(engineer)}
                   >
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{engineer.name}</td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.email || engineer.user?.email || "—"}</span></td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.phone || "—"}</span></td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.user?.phone || engineer.phone || "â€”"}</span></td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.phone || "â€”"}</span></td>
                     <td className="px-4 py-3 text-sm">{engineer.baseSalary.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">{engineer.transportAllowance.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">{engineer.commissionRate}%</td>
@@ -603,7 +602,7 @@ export default function EngineersPage() {
                         {engineer.assignedCustomersCount ?? 0}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{engineer.user?.name || engineer.user?.email || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{engineer.user?.name || engineer.user?.phone || "â€”"}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${engineer.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${engineer.isActive ? "bg-green-500" : "bg-red-500"}`} />

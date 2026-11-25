@@ -68,7 +68,7 @@ enum NotificationType {
 model User {
   id           String   @id @default(cuid())
   name         String
-  email        String   @unique
+  phone        String   @unique
   passwordHash String
   role         UserRole
   companyId    String?
@@ -266,7 +266,7 @@ model ErrorReport {
   action     String?
   details    String?
   userId     String?
-  userEmail  String?
+  userPhone  String?
   createdAt  DateTime @default(now())
   resolvedAt DateTime?
 

@@ -15,7 +15,7 @@ async function main() {
 
   const users = await prisma.user.findMany({
     select: {
-      id: true, name: true, email: true, role: true, roleId: true, isActive: true, companyId: true,
+      id: true, name: true, phone: true, role: true, roleId: true, isActive: true, companyId: true,
       engineer: { select: { id: true, name: true } },
       employee: { select: { id: true, fullName: true, code: true } },
     },
@@ -40,7 +40,7 @@ async function main() {
   console.log("\n=== ENGINEERS ===");
   const engineers = await prisma.engineer.findMany({
     select: {
-      id: true, name: true, email: true, isActive: true, userId: true,
+      id: true, name: true, phone: true, isActive: true, userId: true,
       employee: { select: { code: true, fullName: true, Department: { select: { code: true } } } },
       _count: { select: { customers: true, serviceRequests: true } },
     },

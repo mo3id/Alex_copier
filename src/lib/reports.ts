@@ -114,7 +114,7 @@ export async function loadContractProfitability(): Promise<ContractProfitability
 export interface EngineerPerformanceRow {
   id: string;
   name: string;
-  user: { id: string; name: string; email: string } | null;
+  user: { id: string; name: string; phone: string } | null;
   areas: string[];
   skills: string[];
   baseSalary: number;
@@ -134,7 +134,7 @@ export async function loadEngineerPerformance(): Promise<EngineerPerformanceRow[
       commissionRate: true,
       areas: { select: { areaName: true } },
       skills: { select: { modelType: true } },
-      user: { select: { id: true, name: true, email: true } },
+      user: { select: { id: true, name: true, phone: true } },
       serviceRequests: { select: { status: true, customerRating: true, _count: { select: { visits: true } } } },
     },
     orderBy: { createdAt: "desc" },

@@ -4,8 +4,7 @@ import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireSuperAdmin } from "@/lib/auth-helpers";
 import { ROLES } from "@/lib/permissions";
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 async function GET__raw() {
   try {
@@ -21,7 +20,7 @@ async function GET__raw() {
       select: {
         id: true,
         name: true,
-        email: true,
+        phone: true,
         role: true,
         companyId: true,
         isActive: true,
@@ -30,7 +29,7 @@ async function GET__raw() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(users);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
 }
@@ -48,20 +47,20 @@ async function POST__raw(request: Request) {
 
     const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const phone = normalizePhone(typeof body.phone === "string" ? body.phone : "");
     const password = typeof body.password === "string" ? body.password : "";
     const role = body.role;
     const companyId =
       typeof body.companyId === "string" && body.companyId !== "" ? body.companyId : null;
 
-    if (!name || !email || !password) {
+    if (!name || !phone || !password) {
       return NextResponse.json(
-        { error: "الاسم والبريد الإلكتروني وكلمة المرور والدور مطلوبة", code: "USER_FIELDS_REQUIRED" },
+        { error: "الاسم ورقم التليفون وكلمة المرور والدور مطلوبة", code: "USER_FIELDS_REQUIRED" },
         { status: 400 }
       );
     }
-    if (!EMAIL_REGEX.test(email)) {
-      return NextResponse.json({ error: "صيغة البريد الإلكتروني غير صحيحة", code: "INVALID_EMAIL" }, { status: 400 });
+    if (!isValidPhone(phone)) {
+      return NextResponse.json({ error: "صيغة رقم التليفون غير صحيحة", code: "INVALID_PHONE" }, { status: 400 });
     }
     if (password.length < 6) {
       return NextResponse.json(
@@ -73,9 +72,9 @@ async function POST__raw(request: Request) {
       return NextResponse.json({ error: "الدور غير صالح", code: "INVALID_ROLE" }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { phone } });
     if (existing) {
-      return NextResponse.json({ error: "البريد الإلكتروني مستخدم بالفعل" }, { status: 409 });
+      return NextResponse.json({ error: "رقم التليفون مستخدم بالفعل", code: "DUPLICATE_PHONE" }, { status: 409 });
     }
 
     if (companyId) {
@@ -90,11 +89,11 @@ async function POST__raw(request: Request) {
     // profile (assignments, visits, custody). Create both atomically.
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { name, email, passwordHash, role, companyId },
+        data: { name, phone, passwordHash, role, companyId },
         select: {
           id: true,
           name: true,
-          email: true,
+          phone: true,
           role: true,
           companyId: true,
           isActive: true,
@@ -115,7 +114,7 @@ async function POST__raw(request: Request) {
       "code" in error &&
       (error as { code?: string }).code === "P2002"
     ) {
-      return NextResponse.json({ error: "البريد الإلكتروني مستخدم بالفعل" }, { status: 409 });
+      return NextResponse.json({ error: "رقم التليفون مستخدم بالفعل", code: "DUPLICATE_PHONE" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }

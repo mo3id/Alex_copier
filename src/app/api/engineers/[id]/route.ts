@@ -39,7 +39,7 @@ async function GET__raw(
           take: 50,
         },
         settlements: { select: { settlementNumber: true, amount: true, status: true, createdAt: true } },
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, phone: true } },
       },
     });
 
@@ -123,7 +123,7 @@ async function PUT__raw(
       include: {
         areas: true,
         skills: true,
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, phone: true } },
       },
     });
 

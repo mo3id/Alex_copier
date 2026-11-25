@@ -4,8 +4,7 @@ import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireSuperAdmin } from "@/lib/auth-helpers";
 import { ROLES } from "@/lib/permissions";
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 async function DELETE__raw(
   _request: Request,
@@ -148,16 +147,16 @@ async function PUT__raw(
       data.name = name;
     }
 
-    if ("email" in body) {
-      const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-      if (!EMAIL_REGEX.test(email)) {
-        return NextResponse.json({ error: "صيغة البريد الإلكتروني غير صحيحة" }, { status: 400 });
+    if ("phone" in body) {
+      const phone = normalizePhone(typeof body.phone === "string" ? body.phone : "");
+      if (!isValidPhone(phone)) {
+        return NextResponse.json({ error: "صيغة رقم التليفون غير صحيحة", code: "INVALID_PHONE" }, { status: 400 });
       }
-      const existing = await prisma.user.findUnique({ where: { email } });
+      const existing = await prisma.user.findUnique({ where: { phone } });
       if (existing && existing.id !== id) {
-        return NextResponse.json({ error: "البريد الإلكتروني مستخدم بالفعل" }, { status: 409 });
+        return NextResponse.json({ error: "رقم التليفون مستخدم بالفعل", code: "DUPLICATE_PHONE" }, { status: 409 });
       }
-      data.email = email;
+      data.phone = phone;
     }
 
     if ("password" in body && body.password !== "") {
@@ -214,7 +213,7 @@ async function PUT__raw(
         select: {
           id: true,
           name: true,
-          email: true,
+          phone: true,
           role: true,
           companyId: true,
           isActive: true,
@@ -246,7 +245,7 @@ async function PUT__raw(
       "code" in error &&
       (error as { code?: string }).code === "P2002"
     ) {
-      return NextResponse.json({ error: "البريد الإلكتروني مستخدم بالفعل" }, { status: 409 });
+      return NextResponse.json({ error: "رقم التليفون مستخدم بالفعل", code: "DUPLICATE_PHONE" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
