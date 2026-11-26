@@ -116,6 +116,7 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [disabled, setDisabled] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -126,6 +127,7 @@ export default function NotificationsPage() {
       const res = await fetch(`/api/notifications?${params.toString()}`);
       if (!res.ok) return;
       const payload = await res.json();
+      setDisabled(Boolean(payload.disabled));
       setItems(Array.isArray(payload.items) ? payload.items : []);
       setUnreadCount(Number(payload.unreadCount ?? 0));
       setTotalPages(Number(payload.totalPages ?? 1));
@@ -204,6 +206,11 @@ export default function NotificationsPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        {disabled && (
+          <div className="p-4 border-b border-amber-200 bg-amber-50 text-sm text-amber-800">
+            إشعارات النظام متوقفة حالياً لتقليل حمل السيرفر. يمكنك تفعيلها من صفحة الإعدادات عند الانتقال لسيرفر أقوى.
+          </div>
+        )}
         <div className="p-4 border-b border-gray-200 flex flex-col gap-2 md:flex-row md:items-center md:flex-wrap">
           <FilterSelect
             value={statusFilter}
@@ -249,7 +256,7 @@ export default function NotificationsPage() {
         ) : items.length === 0 ? (
           <div className="py-16 text-center">
             <Bell size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500">{t("notifications.empty")}</p>
+            <p className="text-gray-500">{disabled ? "إشعارات النظام متوقفة حالياً" : t("notifications.empty")}</p>
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">

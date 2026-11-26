@@ -118,6 +118,8 @@ export default function Header({ title }: { title: string }) {
     }
   };
 
+  const [notificationsDisabled, setNotificationsDisabled] = useState(false);
+
   const fetchNotifications = async () => {
     if (!session?.user?.id) return;
 
@@ -125,13 +127,15 @@ export default function Header({ title }: { title: string }) {
       const response = await fetch("/api/notifications?limit=10");
       if (!response.ok) return;
       const payload = await response.json();
+      const disabled = Boolean(payload.disabled);
       const nextNotifications = Array.isArray(payload.items) ? payload.items : [];
       const nextUnreadCount = Number(payload.unreadCount ?? 0);
 
+      setNotificationsDisabled(disabled);
       setNotifications(nextNotifications);
       setUnreadCount(nextUnreadCount);
 
-      if (hasInitialLoadRef.current && nextUnreadCount > previousUnreadCountRef.current) {
+      if (!disabled && hasInitialLoadRef.current && nextUnreadCount > previousUnreadCountRef.current) {
         void playNotificationTone();
       }
 
@@ -268,15 +272,17 @@ export default function Header({ title }: { title: string }) {
                   )}
                 </span>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={toggleSound}
-                    title={soundEnabled ? t("notifications.soundOff") : t("notifications.soundOn")}
-                    aria-label={soundEnabled ? t("notifications.soundOff") : t("notifications.soundOn")}
-                    className={`rounded-lg p-1.5 transition-colors ${soundEnabled ? "text-blue-600 hover:bg-blue-50" : "text-gray-400 hover:bg-gray-100"}`}
-                  >
-                    {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                  </button>
-                  {unreadCount > 0 && (
+                  {!notificationsDisabled && (
+                    <button
+                      onClick={toggleSound}
+                      title={soundEnabled ? t("notifications.soundOff") : t("notifications.soundOn")}
+                      aria-label={soundEnabled ? t("notifications.soundOff") : t("notifications.soundOn")}
+                      className={`rounded-lg p-1.5 transition-colors ${soundEnabled ? "text-blue-600 hover:bg-blue-50" : "text-gray-400 hover:bg-gray-100"}`}
+                    >
+                      {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                    </button>
+                  )}
+                  {!notificationsDisabled && unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
                       className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -289,7 +295,9 @@ export default function Header({ title }: { title: string }) {
               </div>
 
               <div className="max-h-80 overflow-y-auto">
-                {notifications.length === 0 ? (
+                {notificationsDisabled ? (
+                  <div className="px-4 py-6 text-sm text-gray-500 text-center">إشعارات النظام متوقفة حالياً لتقليل حمل السيرفر.</div>
+                ) : notifications.length === 0 ? (
                   <div className="px-4 py-6 text-sm text-gray-500 text-center">{t("notifications.empty")}</div>
                 ) : (
                   notifications.map((notification) => (

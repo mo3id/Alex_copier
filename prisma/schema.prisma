@@ -858,18 +858,20 @@ enum PurchaseOrderStatus {
 }
 
 model PurchaseOrder {
-  id            String              @id @default(cuid())
-  companyId     String
-  supplierId    String
-  status        PurchaseOrderStatus @default(DRAFT)
-  total         Float               @default(0)
-  notes         String?
-  orderDate     DateTime
-  paymentMethod PaymentMethod       @default(CREDIT)
-  paymentStatus PaymentStatus       @default(PENDING)
-  paidAmount    Float               @default(0)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id              String              @id @default(cuid())
+  companyId       String
+  supplierId      String
+  invoiceNumber   String?
+  clientRequestId String?
+  status          PurchaseOrderStatus @default(DRAFT)
+  total           Float               @default(0)
+  notes           String?
+  orderDate       DateTime
+  paymentMethod   PaymentMethod       @default(CREDIT)
+  paymentStatus   PaymentStatus       @default(PENDING)
+  paidAmount      Float               @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   supplier  Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
@@ -878,6 +880,9 @@ model PurchaseOrder {
   returns   ReturnTransaction[]
   movements StockMovement[]
   payments  SupplierPayment[]
+
+  @@unique([companyId, supplierId, clientRequestId])
+  @@index([companyId, supplierId, invoiceNumber])
 }
 
 model PurchaseOrderItem {
@@ -2107,6 +2112,16 @@ model InventorySetting {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
+
+/// Global application settings (singleton row).
+model SystemSetting {
+  id                   String   @id @default("system")
+  /// Master switch for in-app notifications. Default false for free/limited servers.
+  notificationsEnabled Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
 
 model PayrollPeriod {
   id         String       @id @default(cuid())

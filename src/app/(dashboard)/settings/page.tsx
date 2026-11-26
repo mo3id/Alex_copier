@@ -10,7 +10,7 @@ import PrinterLoader from "@/components/PrinterLoader";
 import StatsCards from "@/components/StatsCards";
 import { useConfirm } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
-import { Plus, Pencil, Power, Eye, EyeOff, X, Trash2, Save, AlertTriangle, Users, UserCheck, Wrench, UserX } from "lucide-react";
+import { Plus, Pencil, Power, Eye, EyeOff, X, Trash2, Save, AlertTriangle, Users, UserCheck, Wrench, UserX, BellOff } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
 import FormModal from "@/components/FormModal";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -38,7 +38,18 @@ const ROLE_BADGES: Record<string, string> = {
   SALES_EMPLOYEE: "bg-pink-100 text-pink-800",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  GENERAL_MANAGER: "مدير عام",
+  COMPANY_MANAGER: "مدير شركة",
+  ACCOUNTANT: "محاسب",
+  MAINTENANCE_MANAGER: "مدير صيانة",
+  WORKSHOP_MANAGER: "مدير ورشة",
+  ENGINEER: "مهندس",
+  SALES_EMPLOYEE: "موظف مبيعات",
+};
+
 const ALL_ROLES = Object.keys(ROLE_BADGES);
+const roleLabel = (role: string) => ROLE_LABELS[role] || role;
 
 const emptyForm = {
   name: "",
@@ -78,6 +89,10 @@ const [modalOpen, setModalOpen] = useState(false);
   // The whole-database wipe is off in production unless the deployment opts in,
   // so the button explains itself instead of failing with a 404.
   const [resetEnabled, setResetEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notifEnvOverride, setNotifEnvOverride] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(true);
+  const [notifSaving, setNotifSaving] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -116,11 +131,17 @@ setUsersLoaded(true);
       .then((data) => {
         if (!cancelled && typeof data?.enabled === "boolean") setResetEnabled(data.enabled);
       })
-      // A failed probe leaves the button usable; the POST guard is the real check.
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    fetch("/api/settings/system", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (typeof data?.notificationsEnabled === "boolean") setNotificationsEnabled(data.notificationsEnabled);
+        if (typeof data?.envOverride === "boolean") setNotifEnvOverride(data.envOverride);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setNotifLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const filteredUsers = users.filter(
@@ -272,6 +293,30 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
     }
   };
 
+  const handleNotificationsToggle = async (next: boolean) => {
+    setNotifSaving(true);
+    try {
+      const res = await fetch("/api/settings/system", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationsEnabled: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBanner({ type: "error", text: apiErrorMessage(data, t) });
+        return;
+      }
+      setNotificationsEnabled(Boolean(data.notificationsEnabled));
+      setNotifEnvOverride(Boolean(data.envOverride));
+      setBanner({ type: "success", text: data.notificationsEnabled ? "تم تشغيل إشعارات النظام" : "تم إيقاف إشعارات النظام" });
+      notifyDataChanged(["notifications"]);
+    } catch {
+      setBanner({ type: "error", text: t("common.error") });
+    } finally {
+      setNotifSaving(false);
+    }
+  };
+
   return (
     <div dir={dir}>
       <h1 className="text-xl sm:text-2xl font-bold mb-6">{t("users.title")}</h1>
@@ -306,6 +351,28 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
               </button>
             </div>
           )}
+
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="p-5 sm:p-6 border-b bg-slate-50/60">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 flex items-center gap-2"><BellOff size={18} /> إشعارات النظام</h2>
+                  <p className="mt-1 text-sm text-slate-600">إيقاف الإشعارات يقلل حمل السيرفر وقاعدة البيانات. الوضع الافتراضي في الكود: متوقفة. عند الانتقال لسيرفر جديد يمكنك تشغيلها من هنا.</p>
+                  {notifEnvOverride && <p className="mt-1 text-xs text-amber-700">متغير البيئة NOTIFICATIONS_ENABLED مفعّل وقد يتجاوز إعداد الواجهة.</p>}
+                </div>
+                <label className="inline-flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-medium">
+                  <span>{notificationsEnabled ? "مفعّلة" : "متوقفة"}</span>
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5"
+                    checked={notificationsEnabled}
+                    disabled={notifLoading || notifSaving}
+                    onChange={(e) => void handleNotificationsToggle(e.target.checked)}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
 
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="p-4 border-b flex flex-col gap-2 md:flex-row md:items-center md:flex-wrap">

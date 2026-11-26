@@ -55,10 +55,7 @@ async function syncPurchasePayment(tx: PurchaseTx, po: { id: string; supplierId:
     paymentDate: po.orderDate ? new Date(po.orderDate) : new Date(),
     paymentMethod: po.paymentMethod === "CASH" ? "كاش" : "دفعة مع فاتورة شراء",
     docNumber: `PO-${po.id.slice(0, 8)}`,
-    notes:
-      po.paymentMethod === "CASH"
-        ? `سداد نقدي مع فاتورة شراء #${po.id.slice(0, 8)}`
-        : `دفعة مع فاتورة شراء #${po.id.slice(0, 8)}`,
+    notes: po.paymentMethod === "CASH" ? `سداد نقدي مع فاتورة شراء #${po.id.slice(0, 8)}` : `دفعة مع فاتورة شراء #${po.id.slice(0, 8)}`,
   };
   if (existing) await tx.supplierPayment.update({ where: { id: existing.id }, data });
   else await tx.supplierPayment.create({ data });
@@ -110,6 +107,7 @@ async function PUT__raw(
     const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
     const itemsProvided = Array.isArray(items);
     const normalizedItems = itemsProvided ? normalizePurchaseItems(items) : null;
+    const invoiceNumber = data.invoiceNumber !== undefined ? (typeof data.invoiceNumber === "string" ? data.invoiceNumber.trim().slice(0, 120) : "") : undefined;
     if (itemsProvided && (!normalizedItems || normalizedItems.length === 0)) {
       return NextResponse.json(
         { error: "بنود أمر الشراء غير صالحة — تأكد من المنتج والكمية والسعر", code: "INVALID_ITEMS" },
@@ -139,12 +137,28 @@ async function PUT__raw(
       if (distinct.size > 0) {
         const found = await prisma.product.count({ where: { id: { in: [...distinct] } } });
         if (found !== distinct.size) {
-          return NextResponse.json({ error: "منتج غير موجود في سجل المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
+          return NextResponse.json({ error: "منتج غير موجود في سطر المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
+        }
+        const targetCompanyId = typeof data.companyId === "string" && data.companyId ? data.companyId : existing.companyId;
+        const companyMismatch = await prisma.product.count({ where: { id: { in: [...distinct] }, companyId: { not: targetCompanyId } } });
+        if (companyMismatch > 0) {
+          return NextResponse.json({ error: "بعض المنتجات لا تنتمي للشركة المختارة", code: "PRODUCT_COMPANY_MISMATCH" }, { status: 400 });
         }
       }
     }
 
     const companyId = typeof data.companyId === "string" && data.companyId ? data.companyId : existing.companyId;
+    const supplierId = typeof data.supplierId === "string" && data.supplierId ? data.supplierId : existing.supplierId;
+    const finalInvoiceNumber = invoiceNumber !== undefined ? invoiceNumber : ((existing as any).invoiceNumber || "");
+    if (finalInvoiceNumber) {
+      const duplicate = await prisma.purchaseOrder.findFirst({
+        where: { id: { not: id }, companyId, supplierId, invoiceNumber: finalInvoiceNumber, status: { not: "CANCELLED" } },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return NextResponse.json({ error: "رقم بيان/فاتورة المورد مسجل بالفعل لهذا المورد", code: "DUPLICATE_PURCHASE_INVOICE" }, { status: 409 });
+      }
+    }
     if (nextStatus === "RECEIVED" && !companyId) {
       return NextResponse.json({ error: "الشركة مطلوبة عند استلام أمر الشراء", code: "COMPANY_REQUIRED_FOR_RECEIVE" }, { status: 400 });
     }
@@ -173,6 +187,7 @@ async function PUT__raw(
         data: {
           ...(data.companyId !== undefined ? { companyId: data.companyId } : {}),
           ...(data.supplierId !== undefined ? { supplierId: data.supplierId } : {}),
+          ...(invoiceNumber !== undefined ? { invoiceNumber: invoiceNumber || null } : {}),
           ...(data.status !== undefined ? { status: data.status } : {}),
           ...(data.orderDate !== undefined ? { orderDate: data.orderDate } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
@@ -242,12 +257,18 @@ async function PUT__raw(
         where: { id },
         include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
       });
-    });
+    }, { maxWait: 10000, timeout: 60000 });
 
     return NextResponse.json(po);
   } catch (error: unknown) {
+    if (error && typeof error === "object" && "code" in error && (error as any).code === "P2002") {
+      const target = String((error as any).meta?.target || "");
+      if (target.includes("invoiceNumber")) {
+        return NextResponse.json({ error: "رقم بيان/فاتورة المورد مسجل بالفعل لهذا المورد", code: "DUPLICATE_PURCHASE_INVOICE" }, { status: 409 });
+      }
+    }
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يسمح بتعديل سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to update purchase order" }, { status: traceError("[purchases:PUT] update failed", error) });
   }
@@ -272,14 +293,14 @@ async function DELETE__raw(
       }
       await tx.supplierPayment.deleteMany({ where: { purchaseOrderId: id } });
       await tx.purchaseOrder.delete({ where: { id } });
-    });
+    }, { maxWait: 10000, timeout: 60000 });
     return NextResponse.json({ message: "Deleted" });
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يسمح بتعديل سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }

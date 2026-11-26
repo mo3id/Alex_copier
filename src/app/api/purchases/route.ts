@@ -62,9 +62,11 @@ async function POST__raw(request: Request) {
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });
     }
         const body = await request.json();
-    const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
+    const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, clientRequestId: rawClientRequestId, ...data } = body;
+    const clientRequestId = typeof rawClientRequestId === "string" ? rawClientRequestId.trim().slice(0, 120) : "";
     const itemsProvided = Array.isArray(items);
     const normalizedItems = itemsProvided ? normalizePurchaseItems(items) : null;
+    const invoiceNumber = typeof data.invoiceNumber === "string" ? data.invoiceNumber.trim().slice(0, 120) : "";
     if (itemsProvided && (!normalizedItems || normalizedItems.length === 0)) {
       return NextResponse.json(
         { error: "بنود أمر الشراء غير صالحة — تأكد من المنتج والكمية والسعر", code: "INVALID_ITEMS" },
@@ -96,8 +98,28 @@ async function POST__raw(request: Request) {
       const distinct = new Set(normalizedItems.map((item) => item.productId));
       const found = await prisma.product.count({ where: { id: { in: [...distinct] } } });
       if (found !== distinct.size) {
-        return NextResponse.json({ error: "منتج غير موجود في سجل المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
+        return NextResponse.json({ error: "منتج غير موجود في سطر المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
       }
+      const companyMismatch = await prisma.product.count({ where: { id: { in: [...distinct] }, companyId: { not: companyId } } });
+      if (companyMismatch > 0) {
+        return NextResponse.json({ error: "بعض المنتجات لا تنتمي للشركة المختارة", code: "PRODUCT_COMPANY_MISMATCH" }, { status: 400 });
+      }
+    }
+    if (invoiceNumber) {
+      const duplicate = await prisma.purchaseOrder.findFirst({
+        where: { companyId, supplierId, invoiceNumber, status: { not: "CANCELLED" } },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return NextResponse.json({ error: "رقم بيان/فاتورة المورد مسجل بالفعل لهذا المورد", code: "DUPLICATE_PURCHASE_INVOICE" }, { status: 409 });
+      }
+    }
+    if (clientRequestId) {
+      const existingByRequest = await prisma.purchaseOrder.findFirst({
+        where: { companyId, supplierId, clientRequestId },
+        include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
+      });
+      if (existingByRequest) return NextResponse.json(existingByRequest, { status: 200 });
     }
 
     const payment = normalizePurchasePayment({ paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, total });
@@ -107,6 +129,8 @@ async function POST__raw(request: Request) {
         data: {
           companyId: data.companyId,
           supplierId: data.supplierId,
+          invoiceNumber: invoiceNumber || null,
+          clientRequestId: clientRequestId || null,
           status: data.status,
           orderDate: data.orderDate,
           notes: data.notes ?? null,
@@ -145,10 +169,7 @@ async function POST__raw(request: Request) {
             paymentDate: created.orderDate ? new Date(created.orderDate) : new Date(),
             paymentMethod: created.paymentMethod === "CASH" ? "كاش" : "دفعة مع فاتورة شراء",
             docNumber: `PO-${created.id.slice(0, 8)}`,
-            notes:
-              created.paymentMethod === "CASH"
-                ? `سداد نقدي مع فاتورة شراء #${created.id.slice(0, 8)}`
-                : `دفعة مقدمة مع فاتورة شراء #${created.id.slice(0, 8)}`,
+            notes: created.paymentMethod === "CASH" ? `سداد نقدي مع فاتورة شراء #${created.id.slice(0, 8)}` : `دفعة مع فاتورة شراء #${created.id.slice(0, 8)}`,
           },
         });
       }
@@ -171,10 +192,29 @@ async function POST__raw(request: Request) {
         where: { id: created.id },
         include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
       });
-    });
+    }, { maxWait: 10000, timeout: 60000 });
 
     return NextResponse.json(purchaseOrder, { status: 201 });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error as any).code === "P2002") {
+      const target = String((error as any).meta?.target || "");
+      if (target.includes("clientRequestId")) {
+        const body = await request.clone().json().catch(() => null);
+        const companyId = typeof body?.companyId === "string" ? body.companyId : "";
+        const supplierId = typeof body?.supplierId === "string" ? body.supplierId : "";
+        const clientRequestId = typeof body?.clientRequestId === "string" ? body.clientRequestId.trim().slice(0, 120) : "";
+        if (companyId && supplierId && clientRequestId) {
+          const existing = await prisma.purchaseOrder.findFirst({
+            where: { companyId, supplierId, clientRequestId },
+            include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
+          });
+          if (existing) return NextResponse.json(existing, { status: 200 });
+        }
+      }
+      if (target.includes("invoiceNumber")) {
+        return NextResponse.json({ error: "رقم بيان/فاتورة المورد مسجل بالفعل لهذا المورد", code: "DUPLICATE_PURCHASE_INVOICE" }, { status: 409 });
+      }
+    }
     return NextResponse.json({ error: "Failed to create purchase order" }, { status: traceError("[purchases:POST] create failed", error) });
   }
 }

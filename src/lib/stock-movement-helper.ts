@@ -237,35 +237,41 @@ export async function receivePurchaseIntoStock(
     notes?: string;
   }
 ): Promise<void> {
-  for (const item of args.items) {
-    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-      throw new Error("INVALID_PURCHASE_QUANTITY");
+  const valid = args.items.filter((i) => Number.isInteger(i.quantity) && i.quantity > 0);
+  if (valid.length !== args.items.length) throw new Error("INVALID_PURCHASE_QUANTITY");
+  if (valid.length === 0) return;
+  const totals = new Map<string, { quantity: number; unitPrice?: number }>();
+  for (const item of valid) {
+    const prev = totals.get(item.productId);
+    totals.set(item.productId, { quantity: (prev?.quantity ?? 0) + item.quantity, unitPrice: item.unitPrice ?? prev?.unitPrice });
+  }
+  const productIds = [...totals.keys()];
+  const existingRows = await tx.warehouseInventory.findMany({
+    where: { warehouseId: args.warehouseId, productId: { in: productIds } },
+    select: { productId: true, quantity: true },
+  });
+  const byProduct = new Map(existingRows.map((r) => [r.productId, r.quantity]));
+  for (const [productId, agg] of totals) {
+    const available = byProduct.get(productId) ?? 0;
+    const key = { warehouseId: args.warehouseId, productId };
+    if (byProduct.has(productId)) {
+      await tx.warehouseInventory.update({ where: { warehouseId_productId: key }, data: { quantity: available + agg.quantity } });
+    } else {
+      await tx.warehouseInventory.create({ data: { ...key, quantity: agg.quantity } });
     }
-    const existing = await tx.warehouseInventory.findUnique({
-      where: { warehouseId_productId: { warehouseId: args.warehouseId, productId: item.productId } },
-    });
-    const available = existing?.quantity ?? 0;
-    await tx.warehouseInventory.upsert({
-      where: { warehouseId_productId: { warehouseId: args.warehouseId, productId: item.productId } },
-      update: { quantity: available + item.quantity },
-      create: { warehouseId: args.warehouseId, productId: item.productId, quantity: item.quantity },
-    });
     await tx.stockMovement.create({
       data: {
         warehouseId: args.warehouseId,
-        productId: item.productId,
-        quantity: item.quantity,
+        productId,
+        quantity: agg.quantity,
         movementType: "PURCHASE_IN",
         purchaseOrderId: args.purchaseOrderId,
         referenceId: args.purchaseOrderId,
         notes: args.notes ?? `استلام أمر شراء ${args.purchaseOrderId}`,
       },
     });
-    if (typeof item.unitPrice === "number" && item.unitPrice > 0) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { purchasePrice: item.unitPrice },
-      });
+    if (typeof agg.unitPrice === "number" && agg.unitPrice > 0) {
+      await tx.product.update({ where: { id: productId }, data: { purchasePrice: agg.unitPrice } });
     }
   }
 }

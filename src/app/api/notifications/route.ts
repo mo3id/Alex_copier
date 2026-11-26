@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import {
   createNotification,
+  getNotificationsEnabled,
   getNotificationsForUser,
   getUnreadNotificationsCount,
   markAllNotificationsAsRead,
@@ -54,8 +55,11 @@ async function GET__raw(request: Request) {
       );
     }
 
-    // Opportunistic business sweep (contract expiry / low stock), throttled internally.
-    void runBusinessNotificationSweep().catch(() => undefined);
+    const enabled = await getNotificationsEnabled();
+    if (enabled) {
+      // Opportunistic business sweep (contract expiry / low stock), throttled internally.
+      void runBusinessNotificationSweep().catch(() => undefined);
+    }
 
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get("unread") === "true";
@@ -100,6 +104,10 @@ async function POST__raw(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (!(await getNotificationsEnabled())) {
+      return NextResponse.json({ message: "Notifications are disabled", disabled: true, unreadCount: 0 }, { status: 200 });
+    }
+
     const notification = await createNotification({
       userId: targetUserId,
       senderId: data.senderId ?? user.id,
@@ -116,11 +124,12 @@ async function POST__raw(request: Request) {
 
     return NextResponse.json(
       {
-        message: "Notification created",
+        message: notification ? "Notification created" : "Notifications are disabled",
         notification,
         unreadCount: await getUnreadNotificationsCount(targetUserId),
+        disabled: !notification,
       },
-      { status: 201 },
+      { status: notification ? 201 : 200 },
     );
   } catch (error) {
     if (error instanceof z.ZodError) {

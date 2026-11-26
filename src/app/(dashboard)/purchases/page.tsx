@@ -125,6 +125,7 @@ export default function PurchasesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const submitIdempotencyRef = useRef<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -132,7 +133,7 @@ export default function PurchasesPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
+  const [form, setForm] = useState({ companyId: "", supplierId: "", invoiceNumber: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
@@ -199,7 +200,7 @@ export default function PurchasesPage() {
 
   const openCreateOrder = () => {
     setEditingId(null);
-    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
+    setForm({ companyId: "", supplierId: "", invoiceNumber: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setPriceHistory({});
     setPriceHistoryLoading({});
@@ -382,7 +383,8 @@ export default function PurchasesPage() {
       const orderDateIso = form.orderDate
         ? new Date(`${form.orderDate}T12:00:00.000Z`).toISOString()
         : new Date().toISOString();
-      const payload = { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, items };
+      if (!editingId && !submitIdempotencyRef.current) submitIdempotencyRef.current = (globalThis.crypto?.randomUUID?.() ?? `po-${Date.now()}-${Math.random().toString(36).slice(2,10)}`);
+      const payload = { ...form, invoiceNumber: form.invoiceNumber.trim() || undefined, orderDate: orderDateIso, paidAmount: paidAmountPayload, items, ...(editingId ? {} : { clientRequestId: submitIdempotencyRef.current }) };
       const url = editingId ? `/api/purchases/${editingId}` : "/api/purchases";
       const method = editingId ? "PUT" : "POST";
       const { response, data } = await apiFetch<PurchaseOrder>(url, {
@@ -401,13 +403,15 @@ export default function PurchasesPage() {
       setSaving(false);
     }
     if (!saved) return;
+    submitIdempotencyRef.current = null;
     resetOrderForm();
     refresh();
     notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
   };
 
   const resetOrderForm = () => {
-    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
+    submitIdempotencyRef.current = null;
+    setForm({ companyId: "", supplierId: "", invoiceNumber: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setEditingId(null);
     setShowForm(false);
@@ -512,6 +516,7 @@ export default function PurchasesPage() {
     setForm({
       companyId: order.companyId,
       supplierId: order.supplierId,
+      invoiceNumber: (order as any).invoiceNumber || "",
       notes: order.notes || "",
       status: order.status,
       orderDate: (order.orderDate || order.createdAt || "").slice(0, 10),
@@ -697,7 +702,11 @@ export default function PurchasesPage() {
               }}
             />
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">رقم بيان/فاتورة المورد</label>
+              <input type="text" value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} className={inputClass} placeholder="اختياري - يساعد على منع التكرار" maxLength={120} />
+            </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("purchases.orderDate")}</label>
               <input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} className={inputClass} required />

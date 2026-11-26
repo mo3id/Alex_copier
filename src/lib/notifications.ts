@@ -62,6 +62,45 @@ export interface NotificationInput {
 /** Threshold under which a spare part is considered low on stock. */
 export const LOW_STOCK_THRESHOLD = 5;
 
+const SYSTEM_SETTING_ID = "system";
+const NOTIFICATIONS_CACHE_MS = 30_000;
+let notificationsEnabledCache: { value: boolean; expiresAt: number } | null = null;
+
+export function isNotificationsEnabledByEnv(): boolean {
+  const v = (process.env.NOTIFICATIONS_ENABLED ?? process.env.SYSTEM_NOTIFICATIONS_ENABLED ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(v)) return true;
+  if (["0", "false", "no", "off"].includes(v)) return false;
+  // Safe default for limited/free servers: notifications OFF unless explicitly enabled.
+  return false;
+}
+
+export async function getNotificationsEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (notificationsEnabledCache && notificationsEnabledCache.expiresAt > now) return notificationsEnabledCache.value;
+  const envEnabled = isNotificationsEnabledByEnv();
+  try {
+    const row = await (prisma as any).systemSetting.findUnique({ where: { id: SYSTEM_SETTING_ID }, select: { notificationsEnabled: true } });
+    const value = envEnabled || Boolean(row?.notificationsEnabled);
+    notificationsEnabledCache = { value, expiresAt: now + NOTIFICATIONS_CACHE_MS };
+    return value;
+  } catch {
+    notificationsEnabledCache = { value: envEnabled, expiresAt: now + NOTIFICATIONS_CACHE_MS };
+    return envEnabled;
+  }
+}
+
+export async function setNotificationsEnabled(enabled: boolean): Promise<boolean> {
+  const safe = Boolean(enabled);
+  const row = await (prisma as any).systemSetting.upsert({
+    where: { id: SYSTEM_SETTING_ID },
+    update: { notificationsEnabled: safe },
+    create: { id: SYSTEM_SETTING_ID, notificationsEnabled: safe },
+    select: { notificationsEnabled: true },
+  });
+  notificationsEnabledCache = { value: isNotificationsEnabledByEnv() || Boolean(row.notificationsEnabled), expiresAt: Date.now() + NOTIFICATIONS_CACHE_MS };
+  return Boolean(row.notificationsEnabled);
+}
+
 function serialize<T extends { createdAt: Date; updatedAt: Date; readAt: Date | null }>(notification: T) {
   return {
     ...notification,
@@ -91,6 +130,11 @@ export async function getNotificationsForUser(
   const take = Math.max(1, Math.min(options.take ?? 20, 50));
   const page = Math.max(1, options.page ?? 1);
 
+  const enabled = await getNotificationsEnabled();
+  if (!enabled) {
+    return { items: [], unreadCount: 0, totalCount: 0, page: 1, pageSize: take, totalPages: 1, disabled: true };
+  }
+
   const where = {
     userId,
     ...(unreadOnly ? { isRead: false } : {}),
@@ -117,6 +161,7 @@ export async function getNotificationsForUser(
     page,
     pageSize: take,
     totalPages: Math.max(1, Math.ceil(totalCount / take)),
+    disabled: false,
   };
 }
 
@@ -124,6 +169,8 @@ export async function createNotification(input: NotificationInput) {
   if (!input.userId) {
     throw new Error("Notification userId is required");
   }
+
+  if (!(await getNotificationsEnabled())) return null;
 
   const notification = await prisma.notification.create({
     data: {
@@ -159,7 +206,8 @@ export async function createNotificationsForUsers(
   );
   return results
     .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof createNotification>>> => r.status === "fulfilled")
-    .map((r) => r.value);
+    .map((r) => r.value)
+    .filter((v): v is NonNullable<typeof v> => Boolean(v));
 }
 
 export async function markNotificationAsRead(notificationId: string, userId: string) {
@@ -393,6 +441,7 @@ let lastSweepAt = 0;
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 
 export async function runBusinessNotificationSweep(force = false) {
+  if (!(await getNotificationsEnabled())) return { skipped: true, disabled: true };
   const now = Date.now();
   if (!force && now - lastSweepAt < SWEEP_INTERVAL_MS) return { skipped: true };
 
